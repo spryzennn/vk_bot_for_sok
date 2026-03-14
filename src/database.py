@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def create_connection():
-    """Создаёт и возвращает новое соединение с БД."""
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT"),
