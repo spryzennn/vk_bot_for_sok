@@ -4,16 +4,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def create_connection():
+    """Создаёт и возвращает новое соединение с БД."""
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
+    )
 
 class Database:
     def __init__(self):
-        self.connection = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD")
-        )
+        self.connection = create_connection()
         self.cursor = self.connection.cursor()
 
     def execute(self, query, params=None):
@@ -32,6 +35,5 @@ class Database:
     def close(self):
         self.cursor.close()
         self.connection.close()
-
 
 db = Database()
