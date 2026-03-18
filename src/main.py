@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 vk_token = os.getenv('VK_TOKEN')
+admin_id = os.getenv('ADMIN_ID')
 vk_session = vk_api.VkApi(token=vk_token)
 session_api = vk_session.get_api()
 longpoll = VkLongPoll(vk_session)
@@ -57,6 +58,10 @@ def send_msg(user_id, text, keyboard=None):
         logger.error(f"Ошибка отправки сообщения пользователю {user_id}: {e}")
 
 def send_report_to_chat(user_id):
+    # Проверка, что пользователь - админ
+    if admin_id and str(user_id) != str(admin_id):
+        send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard())
+        return
     try:
         applications = get_applications(limit=10)
         text = format_applications_text(applications)
@@ -124,7 +129,7 @@ for event in longpoll.listen():
             handle_application(user_id, None)
         elif msg in ("отчет", "заявки", "посмотреть заявки"):
             send_report_to_chat(user_id)
-        elif msg in ("почта", "отчет на почту"):
+        elif msg in ("почта", "отчет на почту", "отправь по почте заявки"):
             threading.Thread(target=send_email_report, daemon=True).start()
             send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_main_keyboard())
         elif msg == "помощь":
