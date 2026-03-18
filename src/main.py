@@ -6,7 +6,7 @@ import vk_api
 from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
 from database import db
-from reports import get_applications, format_applications_text, send_email_report
+from reports import get_applications, format_applications_text, send_email_report, send_new_application_email
 from keyboards import get_main_keyboard, get_application_keyboard, get_cancel_keyboard, get_empty_keyboard
 
 load_dotenv()
@@ -112,7 +112,7 @@ def handle_application(user_id, msg):
         user_states.set_state(user_id, None)
         send_msg(user_id, f"Заявка сохранена!\n\nИмя: {data['name']}\nТелефон: {data['phone']}\nПримечание: {note or 'нет'}", get_main_keyboard())
 
-        threading.Thread(target=send_email_report, daemon=True).start()
+        threading.Thread(target=send_new_application_email, daemon=True).start()
 
 logger.info("Бот запущен и ожидает сообщения...")
 

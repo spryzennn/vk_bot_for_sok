@@ -19,6 +19,19 @@ def get_applications(limit=10):
     finally:
         conn.close()
 
+def get_latest_application():
+    """Получить последнюю заявку"""
+    conn = create_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, phone, note FROM applications ORDER BY id DESC LIMIT 1"
+            )
+            result = cur.fetchone()
+            return [result] if result else []
+    finally:
+        conn.close()
+
 def format_applications_text(applications):
     if not applications:
         return "Нет заявок."
@@ -117,4 +130,40 @@ def send_email_report(to_email=None):
         return True
     except Exception:
         logger.exception("Ошибка отправки email")
+        return False
+
+def send_new_application_email(to_email=None):
+    """Отправить на почту только что полученную заявку"""
+    to_email = to_email or os.getenv('EMAIL_TO')
+    if not to_email:
+        logger.error("EMAIL_TO не задан в .env")
+        return False
+    smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_pass = os.getenv('SMTP_PASSWORD')
+    if not all([smtp_user, smtp_pass]):
+        logger.error("SMTP_USER или SMTP_PASSWORD не заданы")
+        return False
+    try:
+        application = get_latest_application()
+        if not application:
+            logger.warning("Нет заявок для отправки")
+            return False
+        text_part = MIMEText(format_applications_text(application), 'plain')
+        html_part = MIMEText(format_applications_html(application), 'html')
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = 'Новая заявка!'
+        msg['From'] = smtp_user
+        msg['To'] = to_email
+        msg.attach(text_part)
+        msg.attach(html_part)
+        server = smtplib.SMTP(smtp_server, 587)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+        server.quit()
+        logger.info(f"Email о новой заявке отправлен на {to_email}")
+        return True
+    except Exception:
+        logger.exception("Ошибка отправки email о новой заявке")
         return False
