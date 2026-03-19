@@ -1,4 +1,10 @@
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ADMIN_ID = os.getenv('ADMIN_ID')
 
 def get_main_keyboard():
     keyboard = {
@@ -17,14 +23,33 @@ def get_main_keyboard():
                 {
                     "action": {
                         "type": "text",
-                        "label": "Посмотреть заявки"
+                        "label": "Помощь"
                     },
-                    "color": "secondary"
-                },
+                    "color": "default"
+                }
+            ]
+        ]
+    }
+    return json.dumps(keyboard)
+
+def get_main_keyboard_admin():
+    keyboard = {
+        "one_time": False,
+        "buttons": [
+            [
                 {
                     "action": {
                         "type": "text",
-                        "label": "Отчет на почту"
+                        "label": "Оставить заявку"
+                    },
+                    "color": "primary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Панель админа"
                     },
                     "color": "secondary"
                 }
@@ -43,6 +68,23 @@ def get_main_keyboard():
     return json.dumps(keyboard)
 
 def get_application_keyboard():
+    keyboard = {
+        "one_time": True,
+        "buttons": [
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Отмена"
+                    },
+                    "color": "negative"
+                }
+            ]
+        ]
+    }
+    return json.dumps(keyboard)
+
+def get_application_keyboard_with_skip():
     keyboard = {
         "one_time": True,
         "buttons": [
@@ -87,3 +129,38 @@ def get_cancel_keyboard():
 
 def get_empty_keyboard():
     return json.dumps({"buttons": []})
+
+def get_admin_keyboard():
+    keyboard = {
+        "one_time": False,
+        "buttons": [
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Посмотреть заявки"
+                    },
+                    "color": "primary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Отчет на почту"
+                    },
+                    "color": "primary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Назад"
+                    },
+                    "color": "default"
+                }
+            ]
+        ]
+    }
+    return json.dumps(keyboard)

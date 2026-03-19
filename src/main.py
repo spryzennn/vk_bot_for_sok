@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
 from database import db
 from reports import get_applications, format_applications_text, send_email_report, send_new_application_email
-from keyboards import get_main_keyboard, get_application_keyboard, get_cancel_keyboard, get_empty_keyboard
+from keyboards import get_main_keyboard, get_main_keyboard_admin, get_application_keyboard, get_application_keyboard_with_skip, get_admin_keyboard, get_cancel_keyboard, get_empty_keyboard
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -44,6 +44,14 @@ class UserState:
 
 user_states = UserState()
 
+def is_admin(user_id):
+    return admin_id and str(user_id) == str(admin_id)
+
+def get_main_keyboard_for_user(user_id):
+    if is_admin(user_id):
+        return get_main_keyboard_admin()
+    return get_main_keyboard()
+
 def send_msg(user_id, text, keyboard=None):
     try:
         params = {
@@ -58,9 +66,8 @@ def send_msg(user_id, text, keyboard=None):
         logger.error(f"Ошибка отправки сообщения пользователю {user_id}: {e}")
 
 def send_report_to_chat(user_id):
-    # Проверка, что пользователь - админ
     if admin_id and str(user_id) != str(admin_id):
-        send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard())
+        send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
         return
     try:
         applications = get_applications(limit=10)
@@ -78,39 +85,34 @@ def handle_application(user_id, msg):
         send_msg(user_id, "Заполнение заявки\n\nКак вас зовут?", get_application_keyboard())
         return
     if state == "waiting_name":
-        if msg == "отмена":
+        if msg.lower() == "отмена":
             user_states.set_state(user_id, None)
-            send_msg(user_id, "Заявка отменена.", get_main_keyboard())
+            send_msg(user_id, "Заявка отменена.", get_main_keyboard_for_user(user_id))
             return
         user_states.set_data(user_id, "name", msg)
         user_states.set_state(user_id, "waiting_phone")
         send_msg(user_id, f"Отлично, {msg}!\n\nВведите номер телефона:", get_application_keyboard())
     elif state == "waiting_phone":
-        if msg == "отмена":
+        if msg.lower() == "отмена":
             user_states.set_state(user_id, None)
-            send_msg(user_id, "Заявка отменена.", get_main_keyboard())
-            return
-        if msg == "пропустить":
-            user_states.set_data(user_id, "phone", "")
-            user_states.set_state(user_id, "waiting_note")
-            send_msg(user_id, "Пропущено!\n\nДобавьте примечание или нажмите 'Пропустить':", get_application_keyboard())
+            send_msg(user_id, "Заявка отменена.", get_main_keyboard_for_user(user_id))
             return
         user_states.set_data(user_id, "phone", msg)
         user_states.set_state(user_id, "waiting_note")
-        send_msg(user_id, "Номер сохранён!\n\nДобавьте примечание (например, 'позвоните после 12:00') или нажмите 'Пропустить':", get_application_keyboard())
+        send_msg(user_id, f"Номер сохранён!\n\nВведите примечание или нажмите 'Пропустить':", get_application_keyboard_with_skip())
     elif state == "waiting_note":
-        if msg == "отмена":
+        if msg.lower() == "отмена":
             user_states.set_state(user_id, None)
-            send_msg(user_id, "Заявка отменена.", get_main_keyboard())
+            send_msg(user_id, "Заявка отменена.", get_main_keyboard_for_user(user_id))
             return
-        note = msg if msg != "пропустить" else ""
+        note = msg if msg.lower() != "пропустить" else ""
         data = user_states.get_data(user_id)
         db.execute(
             "INSERT INTO applications (name, phone, note) VALUES (%s, %s, %s)",
             (data["name"], data["phone"], note)
         )
         user_states.set_state(user_id, None)
-        send_msg(user_id, f"Заявка сохранена!\n\nИмя: {data['name']}\nТелефон: {data['phone']}\nПримечание: {note or 'нет'}", get_main_keyboard())
+        send_msg(user_id, f"Заявка сохранена!\n\nИмя: {data['name']}\nТелефон: {data['phone']}\nПримечание: {note or 'нет'}", get_main_keyboard_for_user(user_id))
 
         threading.Thread(target=send_new_application_email, daemon=True).start()
 
@@ -121,17 +123,30 @@ for event in longpoll.listen():
         msg = event.text.lower().strip()
         user_id = event.user_id
         if user_states.get_state(user_id):
-            handle_application(user_id, event.text)
+            handle_application(user_id, msg)
             continue
         if msg == "hi":
-            send_msg(user_id, "Привет! Я бот для работы с заявками. Выберите действие:", get_main_keyboard())
+            send_msg(user_id, "Привет! Я бот для работы с заявками. Выберите действие:", get_main_keyboard_for_user(user_id))
         elif msg in ("заявка", "оставить заявку"):
             handle_application(user_id, None)
         elif msg in ("отчет", "заявки", "посмотреть заявки"):
-            send_report_to_chat(user_id)
+            if not is_admin(user_id):
+                send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+            else:
+                send_report_to_chat(user_id)
         elif msg in ("почта", "отчет на почту", "отправь по почте заявки"):
-            threading.Thread(target=send_email_report, daemon=True).start()
-            send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_main_keyboard())
+            if not is_admin(user_id):
+                send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+            else:
+                threading.Thread(target=send_email_report, daemon=True).start()
+                send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_admin_keyboard())
+        elif msg == "админ" or msg == "панель админа":
+            if not is_admin(user_id):
+                send_msg(user_id, "У вас нет доступа к админ-панели.", get_main_keyboard_for_user(user_id))
+            else:
+                send_msg(user_id, "Панель администратора:", get_admin_keyboard())
+        elif msg == "назад":
+            send_msg(user_id, "Главное меню:", get_main_keyboard_for_user(user_id))
         elif msg == "помощь":
             help_text = (
                 "Доступные команды:\n\n"
@@ -140,8 +155,8 @@ for event in longpoll.listen():
                 "Отчет на почту - отправить отчет на email\n"
                 "Помощь - это сообщение"
             )
-            send_msg(user_id, help_text, get_main_keyboard())
+            send_msg(user_id, help_text, get_main_keyboard_for_user(user_id))
         else:
-            send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard())
+            send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
 
 atexit.register(db.close)
