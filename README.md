@@ -1,6 +1,6 @@
 # VK Bot - Бот для работы с заявками
 
-Бот для VK, который принимает заявки от пользователей, сохраняет их в базу данных, отправляет отчеты на email и имеет админ-панель.
+Бот для VK, который принимает заявки от пользователей, хранит их в памяти приложения, отправляет отчеты на email и имеет админ-панель.
 
 ## Файлы проекта
 
@@ -42,26 +42,13 @@
 - `get_cancel_keyboard()` - клавиатура с кнопкой отмены
 - `get_empty_keyboard()` - пустая клавиатура (скрыть кнопки)
 
-### src/database.py
-
-Работа с базой данных PostgreSQL.
-
-**Функции:**
-
-- `create_connection()` - создание подключения к БД
-- `Database` класс:
-  - `execute(query, params)` - выполнение запроса
-  - `fetch_one(query, params)` - получение одной строки
-  - `fetch_all(query, params)` - получение всех строк
-  - `close()` - закрытие подключения
-
 ### src/reports.py
 
 Формирование и отправка отчетов.
 
 **Функции:**
 
-- `get_applications(limit)` - получение последних заявок из БД
+- `get_applications(limit)` - получение последних заявок из памяти приложения
 - `format_applications_text(applications)` - форматирование заявок в текстовый вид
 - `format_applications_html(applications)` - форматирование заявок в HTML для email
 - `send_email_report(to_email)` - отправка отчета на email
@@ -75,11 +62,6 @@
 ```
 VK_TOKEN=токен_группы_vk
 ADMIN_ID=id_администратора_vk
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=имя_бд
-DB_USER=пользователь_бд
-DB_PASSWORD=пароль_бд
 EMAIL_TO=email_для_отчетов
 SMTP_USER=email_отправителя
 SMTP_PASSWORD=пароль_приложения
@@ -91,18 +73,7 @@ SMTP_PASSWORD=пароль_приложения
 pip install -r requirements.txt
 ```
 
-### 3. Создать базу данных
-
-```sql
-CREATE TABLE IF NOT EXISTS applications (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255),
-    phone VARCHAR(50),
-    note TEXT
-);
-```
-
-### 4. Запустить проект
+### 3. Запустить проект
 
 ```bash
 cd src

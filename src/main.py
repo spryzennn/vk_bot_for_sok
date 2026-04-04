@@ -1,11 +1,9 @@
-import atexit
 import logging
 import threading
 import os
 import vk_api
 from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
-from database import db
 from reports import get_applications, format_applications_text, send_email_report, send_new_application_email
 from keyboards import get_main_keyboard, get_main_keyboard_admin, get_application_keyboard, get_application_keyboard_with_skip, get_admin_keyboard, get_cancel_keyboard, get_empty_keyboard
 
@@ -43,6 +41,7 @@ class UserState:
         self.data[user_id][key] = value
 
 user_states = UserState()
+applications = []
 
 def is_admin(user_id):
     return admin_id and str(user_id) == str(admin_id)
@@ -107,14 +106,17 @@ def handle_application(user_id, msg):
             return
         note = msg if msg.lower() != "пропустить" else ""
         data = user_states.get_data(user_id)
-        db.execute(
-            "INSERT INTO applications (name, phone, note) VALUES (%s, %s, %s)",
-            (data["name"], data["phone"], note)
-        )
+        application = {
+            "id": len(applications) + 1,
+            "name": data["name"],
+            "phone": data["phone"],
+            "note": note,
+        }
+        applications.append(application)
         user_states.set_state(user_id, None)
         send_msg(user_id, f"Заявка сохранена!\n\nИмя: {data['name']}\nТелефон: {data['phone']}\nПримечание: {note or 'нет'}", get_main_keyboard_for_user(user_id))
 
-        threading.Thread(target=send_new_application_email, daemon=True).start()
+        threading.Thread(target=send_new_application_email, args=(application,), daemon=True).start()
 
 logger.info("Бот запущен и ожидает сообщения...")
 
@@ -166,4 +168,3 @@ for event in longpoll.listen():
         else:
             send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
 
-atexit.register(db.close)
