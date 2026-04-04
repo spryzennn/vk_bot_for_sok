@@ -5,6 +5,7 @@ import vk_api
 from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
 from reports import get_applications, format_applications_text, send_email_report, send_new_application_email
+from recipients import get_admin_ids
 from keyboards import get_main_keyboard, get_main_keyboard_admin, get_application_keyboard, get_application_keyboard_with_skip, get_admin_keyboard, get_cancel_keyboard, get_empty_keyboard
 
 load_dotenv()
@@ -45,7 +46,7 @@ applications = []
 known_users = {}
 
 def is_admin(user_id):
-    return admin_id and str(user_id) == str(admin_id)
+    return str(user_id) in get_admin_ids(admin_id)
 
 def get_main_keyboard_for_user(user_id):
     if is_admin(user_id):
@@ -113,7 +114,8 @@ def send_known_users_to_admin(user_id):
 
 
 def notify_admin_about_application(application):
-    if not admin_id:
+    admin_ids = get_admin_ids(admin_id)
+    if not admin_ids:
         return
     text = (
         "Новая заявка!\n\n"
@@ -121,7 +123,8 @@ def notify_admin_about_application(application):
         f"Телефон: {application['phone']}\n"
         f"Примечание: {application['note'] or 'нет'}"
     )
-    send_msg(admin_id, text, get_main_keyboard_for_user(admin_id))
+    for current_admin_id in admin_ids:
+        send_msg(current_admin_id, text, get_main_keyboard_for_user(current_admin_id))
 
 def process_application_submission(user_id, application):
     threading.Thread(target=send_new_application_email, args=(application,), daemon=True).start()

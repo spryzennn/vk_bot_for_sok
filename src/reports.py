@@ -3,6 +3,7 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from recipients import get_notification_emails
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +97,9 @@ def format_applications_html(applications):
     return html
 
 def send_email_report(to_email=None):
-    to_email = to_email or os.getenv('EMAIL_TO')
-    if not to_email:
-        logger.error("EMAIL_TO не задан в .env")
+    recipients = [to_email] if to_email else get_notification_emails(os.getenv('EMAIL_TO'))
+    if not recipients:
+        logger.error("Не заданы получатели email")
         return False
     smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
     smtp_user = os.getenv('SMTP_USER')
@@ -113,7 +114,7 @@ def send_email_report(to_email=None):
         msg = MIMEMultipart('alternative')
         msg['Subject'] = 'Отчёт по заявкам'
         msg['From'] = smtp_user
-        msg['To'] = to_email
+        msg['To'] = ", ".join(recipients)
         msg.attach(text_part)
         msg.attach(html_part)
         server = smtplib.SMTP(smtp_server, 587)
@@ -121,7 +122,7 @@ def send_email_report(to_email=None):
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        logger.info(f"Email отправлен на {to_email}")
+        logger.info(f"Email отправлен на {', '.join(recipients)}")
         return True
     except Exception:
         logger.exception("Ошибка отправки email")
@@ -129,9 +130,9 @@ def send_email_report(to_email=None):
 
 def send_new_application_email(application=None, to_email=None):
     """Отправить на почту только что полученную заявку"""
-    to_email = to_email or os.getenv('EMAIL_TO')
-    if not to_email:
-        logger.error("EMAIL_TO не задан в .env")
+    recipients = [to_email] if to_email else get_notification_emails(os.getenv('EMAIL_TO'))
+    if not recipients:
+        logger.error("Не заданы получатели email")
         return False
     smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
     smtp_user = os.getenv('SMTP_USER')
@@ -166,7 +167,7 @@ def send_new_application_email(application=None, to_email=None):
         msg = MIMEMultipart('alternative')
         msg['Subject'] = 'Новая заявка!'
         msg['From'] = smtp_user
-        msg['To'] = to_email
+        msg['To'] = ", ".join(recipients)
         msg.attach(text_part)
         msg.attach(html_part)
         server = smtplib.SMTP(smtp_server, 587)
@@ -174,7 +175,7 @@ def send_new_application_email(application=None, to_email=None):
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        logger.info(f"Email о новой заявке отправлен на {to_email}")
+        logger.info(f"Email о новой заявке отправлен на {', '.join(recipients)}")
         return True
     except Exception:
         logger.exception("Ошибка отправки email о новой заявке")
