@@ -17,9 +17,10 @@ class TestKeyboards:
         
         # Check structure
         assert keyboard['one_time'] is False
-        assert len(keyboard['buttons']) == 2
+        assert len(keyboard['buttons']) == 3
         assert keyboard['buttons'][0][0]['action']['label'] == 'Оставить заявку'
-        assert keyboard['buttons'][1][0]['action']['label'] == 'Помощь'
+        assert keyboard['buttons'][1][0]['action']['label'] == 'Панель админа'
+        assert keyboard['buttons'][2][0]['action']['label'] == 'Помощь'
 
     def test_get_main_keyboard_admin(self):
         from keyboards import get_main_keyboard_admin
@@ -81,7 +82,6 @@ class TestKeyboards:
         keyboard = json.loads(result)
         
         assert keyboard['one_time'] is False
-        assert len(keyboard['buttons']) == 3
-        assert keyboard['buttons'][0][0]['action']['label'] == 'Посмотреть заявки'
-        assert keyboard['buttons'][1][0]['action']['label'] == 'Отчет на почту'
-        assert keyboard['buttons'][2][0]['action']['label'] == 'Назад'
+        assert len(keyboard['buttons']) == 2
+        assert keyboard['buttons'][0][0]['action']['label'] == 'Список пользователей'
+        assert keyboard['buttons'][1][0]['action']['label'] == 'Назад'

@@ -23,6 +23,15 @@ def get_main_keyboard():
                 {
                     "action": {
                         "type": "text",
+                        "label": "Панель админа"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
                         "label": "Помощь"
                     },
                     "color": "default"
@@ -138,16 +147,7 @@ def get_admin_keyboard():
                 {
                     "action": {
                         "type": "text",
-                        "label": "Посмотреть заявки"
-                    },
-                    "color": "primary"
-                }
-            ],
-            [
-                {
-                    "action": {
-                        "type": "text",
-                        "label": "Отчет на почту"
+                        "label": "Список пользователей"
                     },
                     "color": "primary"
                 }

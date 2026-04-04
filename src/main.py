@@ -1,6 +1,6 @@
 import logging
-import threading
 import os
+import threading
 import vk_api
 from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 vk_token = os.getenv('VK_TOKEN')
-admin_id = os.getenv('ADMIN_ID')
+admin_id = os.getenv('ADMIN_ID', '710547454')
 vk_session = vk_api.VkApi(token=vk_token)
 session_api = vk_session.get_api()
 longpoll = VkLongPoll(vk_session)
@@ -42,6 +42,7 @@ class UserState:
 
 user_states = UserState()
 applications = []
+known_users = {}
 
 def is_admin(user_id):
     return admin_id and str(user_id) == str(admin_id)
@@ -76,6 +77,68 @@ def send_report_to_chat(user_id):
     except Exception as e:
         logger.exception("Ошибка при формировании отчёта для чата")
         send_msg(user_id, "Не удалось получить заявки. Попробуйте позже.")
+
+
+def remember_user(user_id):
+    if user_id in known_users:
+        return known_users[user_id]
+    try:
+        response = vk_session.method("users.get", {"user_ids": user_id})
+        if response:
+            user_info = response[0]
+            full_name = f"{user_info.get('first_name', '').strip()} {user_info.get('last_name', '').strip()}".strip()
+            known_users[user_id] = full_name or f"Пользователь {user_id}"
+        else:
+            known_users[user_id] = f"Пользователь {user_id}"
+    except Exception as e:
+        logger.error(f"Ошибка получения данных пользователя {user_id}: {e}")
+        known_users[user_id] = f"Пользователь {user_id}"
+    return known_users[user_id]
+
+
+def format_known_users_text():
+    if not known_users:
+        return "Пользователи ещё не писали боту."
+    lines = ["Список пользователей:"]
+    for user_id, full_name in sorted(known_users.items()):
+        lines.append(f"- {full_name} — ID: {user_id}")
+    return "\n".join(lines)
+
+
+def send_known_users_to_admin(user_id):
+    if not is_admin(user_id):
+        send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        return
+    send_msg(user_id, format_known_users_text(), get_admin_keyboard())
+
+
+def notify_admin_about_application(application):
+    if not admin_id:
+        return
+    text = (
+        "Новая заявка!\n\n"
+        f"Имя: {application['name']}\n"
+        f"Телефон: {application['phone']}\n"
+        f"Примечание: {application['note'] or 'нет'}"
+    )
+    send_msg(admin_id, text, get_main_keyboard_for_user(admin_id))
+
+def process_application_submission(user_id, application):
+    threading.Thread(target=send_new_application_email, args=(application,), daemon=True).start()
+    notify_admin_about_application(application)
+    send_msg(
+        user_id,
+        f"Заявка сохранена!\n\nИмя: {application['name']}\nТелефон: {application['phone']}\nПримечание: {application['note'] or 'нет'}",
+        get_main_keyboard_for_user(user_id)
+    )
+    logger.info(
+        "Заявка сохранена: user_id=%s, name=%s, phone=%s, note=%s",
+        user_id,
+        application['name'],
+        application['phone'],
+        application['note'] or 'нет'
+    )
+
 
 def handle_application(user_id, msg):
     state = user_states.get_state(user_id)
@@ -114,57 +177,62 @@ def handle_application(user_id, msg):
         }
         applications.append(application)
         user_states.set_state(user_id, None)
-        send_msg(user_id, f"Заявка сохранена!\n\nИмя: {data['name']}\nТелефон: {data['phone']}\nПримечание: {note or 'нет'}", get_main_keyboard_for_user(user_id))
-
-        threading.Thread(target=send_new_application_email, args=(application,), daemon=True).start()
+        process_application_submission(user_id, application)
 
 logger.info("Бот запущен и ожидает сообщения...")
+
+
+def main_loop_handler(user_id, msg):
+    remember_user(user_id)
+    if user_states.get_state(user_id):
+        handle_application(user_id, msg)
+        return
+    if msg == "hi":
+        send_msg(user_id, "Привет! Я бот для работы с заявками. Выберите действие:", get_main_keyboard_for_user(user_id))
+    elif msg in ("заявка", "оставить заявку"):
+        handle_application(user_id, None)
+    elif msg in ("отчет", "заявки", "посмотреть заявки"):
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        else:
+            send_report_to_chat(user_id)
+    elif msg in ("почта", "отчет на почту", "отправь по почте заявки"):
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        else:
+            threading.Thread(target=send_email_report, daemon=True).start()
+            send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_admin_keyboard())
+    elif msg == "список пользователей":
+        send_known_users_to_admin(user_id)
+    elif msg == "админ" or msg == "панель админа":
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к админ-панели.", get_main_keyboard_for_user(user_id))
+        else:
+            send_msg(user_id, "Панель администратора:", get_admin_keyboard())
+    elif msg == "назад":
+        send_msg(user_id, "Главное меню:", get_main_keyboard_for_user(user_id))
+    elif msg == "помощь":
+        if is_admin(user_id):
+            help_text = (
+                "Доступные команды:\n\n"
+                "Оставить заявку - подать заявку\n"
+                "Панель админа - открыть меню администратора\n"
+                "Список пользователей - показать всех пользователей, писавших боту\n"
+                "Помощь - это сообщение"
+            )
+        else:
+            help_text = (
+                "Доступные команды:\n\n"
+                "Оставить заявку - подать заявку\n"
+                "Помощь - это сообщение"
+            )
+        send_msg(user_id, help_text, get_main_keyboard_for_user(user_id))
+    else:
+        send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
 
 for event in longpoll.listen():
     if event.type == VkEventType.MESSAGE_NEW and event.to_me:
         msg = event.text.lower().strip()
         user_id = event.user_id
-        if user_states.get_state(user_id):
-            handle_application(user_id, msg)
-            continue
-        if msg == "hi":
-            send_msg(user_id, "Привет! Я бот для работы с заявками. Выберите действие:", get_main_keyboard_for_user(user_id))
-        elif msg in ("заявка", "оставить заявку"):
-            handle_application(user_id, None)
-        elif msg in ("отчет", "заявки", "посмотреть заявки"):
-            if not is_admin(user_id):
-                send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
-            else:
-                send_report_to_chat(user_id)
-        elif msg in ("почта", "отчет на почту", "отправь по почте заявки"):
-            if not is_admin(user_id):
-                send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
-            else:
-                threading.Thread(target=send_email_report, daemon=True).start()
-                send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_admin_keyboard())
-        elif msg == "админ" or msg == "панель админа":
-            if not is_admin(user_id):
-                send_msg(user_id, "У вас нет доступа к админ-панели.", get_main_keyboard_for_user(user_id))
-            else:
-                send_msg(user_id, "Панель администратора:", get_admin_keyboard())
-        elif msg == "назад":
-            send_msg(user_id, "Главное меню:", get_main_keyboard_for_user(user_id))
-        elif msg == "помощь":
-            if is_admin(user_id):
-                help_text = (
-                    "Доступные команды:\n\n"
-                    "Оставить заявку - подать заявку\n"
-                    "Посмотреть заявки - показать последние 10 заявок\n"
-                    "Отчет на почту - отправить отчет на email\n"
-                    "Помощь - это сообщение"
-                )
-            else:
-                help_text = (
-                    "Доступные команды:\n\n"
-                    "Оставить заявку - подать заявку\n"
-                    "Помощь - это сообщение"
-                )
-            send_msg(user_id, help_text, get_main_keyboard_for_user(user_id))
-        else:
-            send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
+        main_loop_handler(user_id, msg)
 

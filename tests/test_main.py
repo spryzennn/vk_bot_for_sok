@@ -147,6 +147,27 @@ class TestMainFunctions:
         send_msg(123, "Hello")
         mock_logger.error.assert_called_once()
 
+    @patch('main.vk_session')
+    def test_remember_user(self, mock_vk_session):
+        from main import remember_user
+        from main import known_users
+        known_users.clear()
+        mock_vk_session.method.return_value = [{"first_name": "Иван", "last_name": "Иванов"}]
+        result = remember_user(123)
+        assert result == "Иван Иванов"
+        assert known_users[123] == "Иван Иванов"
+
+    def test_format_known_users_text(self):
+        from main import format_known_users_text
+        from main import known_users
+        known_users.clear()
+        known_users[123] = "Иван Иванов"
+        known_users[456] = "Петр Петров"
+        result = format_known_users_text()
+        assert "Список пользователей:" in result
+        assert "Иван Иванов — ID: 123" in result
+        assert "Петр Петров — ID: 456" in result
+
 
 class TestHandleApplication:
     
@@ -221,11 +242,12 @@ class TestHandleApplication:
         handle_application(123, "отмена")
         assert user_states.get_state(123) is None
 
+    @patch('main.logger')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
     @patch('main.get_application_keyboard_with_skip')
     @patch('main.send_new_application_email')
-    def test_handle_application_waiting_note_with_note(self, mock_email, mock_kb, mock_main_kb, mock_send_msg):
+    def test_handle_application_waiting_note_with_note(self, mock_email, mock_kb, mock_main_kb, mock_send_msg, mock_logger):
         from main import handle_application
         from main import applications
         from main import user_states
@@ -239,7 +261,9 @@ class TestHandleApplication:
         assert len(applications) == 1
         assert applications[0]["note"] == "Some note"
         assert user_states.get_state(123) is None
-        mock_email.assert_called_once()
+        mock_email.assert_called_once_with(applications[0])
+        assert mock_send_msg.call_count == 2
+        mock_logger.info.assert_called_once()
 
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
@@ -258,6 +282,69 @@ class TestHandleApplication:
         handle_application(123, "Пропустить")
         assert len(applications) == 1
         assert applications[0]["note"] == ""
+
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    def test_notify_admin_about_application(self, mock_main_kb, mock_send_msg):
+        from main import notify_admin_about_application
+        application = {
+            "id": 1,
+            "name": "John",
+            "phone": "+123",
+            "note": "Test note",
+        }
+        mock_main_kb.return_value = 'admin_kb'
+
+        notify_admin_about_application(application)
+
+        mock_send_msg.assert_called_once_with(
+            '710547454',
+            "Новая заявка!\n\nИмя: John\nТелефон: +123\nПримечание: Test note",
+            'admin_kb'
+        )
+
+    @patch('main.threading.Thread')
+    @patch('main.logger')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.notify_admin_about_application')
+    def test_process_application_submission(self, mock_notify_admin, mock_main_kb, mock_send_msg, mock_logger, mock_thread):
+        from main import process_application_submission
+
+        application = {
+            "id": 1,
+            "name": "John",
+            "phone": "+123",
+            "note": "Test note",
+        }
+        mock_main_kb.return_value = 'main_kb'
+        mock_thread_instance = MagicMock()
+        mock_thread.return_value = mock_thread_instance
+
+        process_application_submission(123, application)
+
+        mock_thread.assert_called_once()
+        mock_thread_instance.start.assert_called_once()
+        mock_notify_admin.assert_called_once_with(application)
+        mock_send_msg.assert_called_once_with(
+            123,
+            "Заявка сохранена!\n\nИмя: John\nТелефон: +123\nПримечание: Test note",
+            'main_kb'
+        )
+        mock_logger.info.assert_called_once()
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.is_admin')
+    def test_send_known_users_to_admin(self, mock_is_admin, mock_admin_kb, mock_send_msg):
+        from main import send_known_users_to_admin
+        from main import known_users
+        known_users.clear()
+        known_users[123] = "Иван Иванов"
+        mock_is_admin.return_value = True
+        mock_admin_kb.return_value = 'admin_kb'
+        send_known_users_to_admin(710547454)
+        mock_send_msg.assert_called_once_with(710547454, "Список пользователей:\n- Иван Иванов — ID: 123", 'admin_kb')
 
 
 class TestSendReportToChat:
@@ -313,10 +400,11 @@ class TestSendReportToChat:
 
 class TestMainLoopCommands:
     
+    @patch('main.remember_user')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
     @patch('main.user_states.get_state')
-    def test_hi_command(self, mock_get_state, mock_get_kb, mock_send_msg):
+    def test_hi_command(self, mock_get_state, mock_get_kb, mock_send_msg, mock_remember_user):
         from main import main_loop_handler
         mock_get_state.return_value = None
         mock_get_kb.return_value = 'main_kb'
@@ -326,11 +414,12 @@ class TestMainLoopCommands:
             mock_send_msg.assert_called_once_with(123, 'Привет! Я бот для работы с заявками. Выберите действие:', 'main_kb')
             mock_handle.assert_not_called()
 
+    @patch('main.remember_user')
     @patch('main.handle_application')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
     @patch('main.user_states.get_state')
-    def test_application_command(self, mock_get_state, mock_get_kb, mock_send_msg, mock_handle):
+    def test_application_command(self, mock_get_state, mock_get_kb, mock_send_msg, mock_handle, mock_remember_user):
         from main import main_loop_handler
         mock_get_state.return_value = None
         mock_get_kb.return_value = 'main_kb'
@@ -341,12 +430,13 @@ class TestMainLoopCommands:
         main_loop_handler(123, 'оставить заявку')
         assert mock_handle.call_count == 2
 
+    @patch('main.remember_user')
     @patch('main.send_report_to_chat')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
     @patch('main.is_admin')
     @patch('main.user_states.get_state')
-    def test_report_command_admin(self, mock_get_state, mock_is_admin, mock_get_kb, mock_send_msg, mock_send_report):
+    def test_report_command_admin(self, mock_get_state, mock_is_admin, mock_get_kb, mock_send_msg, mock_send_report, mock_remember_user):
         from main import main_loop_handler
         mock_get_state.return_value = None
         mock_is_admin.return_value = True
@@ -358,16 +448,26 @@ class TestMainLoopCommands:
         main_loop_handler(123, 'посмотреть заявки')
         assert mock_send_report.call_count == 3
 
+    @patch('main.remember_user')
     @patch('main.send_report_to_chat')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
     @patch('main.is_admin')
     @patch('main.user_states.get_state')
-    def test_report_command_non_admin(self, mock_get_state, mock_is_admin, mock_get_kb, mock_send_msg, mock_send_report):
+    def test_report_command_non_admin(self, mock_get_state, mock_is_admin, mock_get_kb, mock_send_msg, mock_send_report, mock_remember_user):
         from main import main_loop_handler
         mock_get_state.return_value = None
         mock_is_admin.return_value = False
         mock_get_kb.return_value = 'user_kb'
+
+    @patch('main.remember_user')
+    @patch('main.send_known_users_to_admin')
+    @patch('main.user_states.get_state')
+    def test_users_list_command(self, mock_get_state, mock_send_users, mock_remember_user):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        main_loop_handler(710547454, 'список пользователей')
+        mock_send_users.assert_called_once_with(710547454)
         
         main_loop_handler(123, 'отчет')
         mock_send_report.assert_not_called()
