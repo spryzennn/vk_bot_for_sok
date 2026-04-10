@@ -24,8 +24,12 @@
 
 **Команды админа** (в панели админа):
 
-- `Посмотреть заявки` - показать последние 10 заявок
-- `Отчет на почту` - отправить отчет на email
+- `Список пользователей` - показать список админов (из файла admin_ids.txt и .env)
+- `Список почт` - показать список email для уведомлений
+- `Добавить админа` - добавить нового админа по VK ID
+- `Удалить админа` - удалить админа по VK ID
+- `Добавить почту` - добавить email для уведомлений
+- `Удалить почту` - удалить email из списка уведомлений
 - `Назад` - вернуться в главное меню
 
 ### src/keyboards.py
@@ -38,7 +42,8 @@
 - `get_main_keyboard_admin()` - главное меню с кнопкой админа (для админа)
 - `get_application_keyboard()` - клавиатура для процесса подачи заявки (только Отмена)
 - `get_application_keyboard_with_skip()` - клавиатура для процесса подачи заявки с кнопкой Пропустить (для примечания)
-- `get_admin_keyboard()` - панель админа (Посмотреть заявки, Отчет на почту, Назад)
+- `get_admin_keyboard()` - панель админа (Список пользователей, Список почт, Добавить/Удалить админа/почту, Назад)
+- `get_admin_input_keyboard()` - клавиатура с кнопкой Отмена (для режима ввода данных)
 - `get_cancel_keyboard()` - клавиатура с кнопкой отмены
 - `get_empty_keyboard()` - пустая клавиатура (скрыть кнопки)
 
@@ -52,6 +57,19 @@
 - `format_applications_text(applications)` - форматирование заявок в текстовый вид
 - `format_applications_html(applications)` - форматирование заявок в HTML для email
 - `send_email_report(to_email)` - отправка отчета на email
+
+### src/recipients.py
+
+Управление списками админов и email.
+
+**Функции:**
+
+- `get_admin_ids(default_admin_id)` - получение списка ID админов (из файла + .env)
+- `get_notification_emails(default_email)` - получение списка email (из файла + .env)
+- `add_admin_id(user_id)` - добавить админа в файл admin_ids.txt
+- `remove_admin_id(user_id)` - удалить админа из файла admin_ids.txt
+- `add_notification_email(email)` - добавить email в файл notification_emails.txt
+- `remove_notification_email(email)` - удалить email из файла notification_emails.txt
 
 ## Работа с проектом
 
