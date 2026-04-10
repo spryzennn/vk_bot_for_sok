@@ -165,6 +165,51 @@ def get_admin_keyboard():
                 {
                     "action": {
                         "type": "text",
+                        "label": "Добавить админа"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Удалить админа"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Добавить почту"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Удалить почту"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Отмена"
+                    },
+                    "color": "negative"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
                         "label": "Назад"
                     },
                     "color": "default"

@@ -5,7 +5,7 @@ import vk_api
 from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
 from reports import get_applications, format_applications_text, send_email_report, send_new_application_email
-from recipients import get_admin_ids, get_notification_emails
+from recipients import get_admin_ids, get_notification_emails, add_admin_id, remove_admin_id, add_notification_email, remove_notification_email
 from keyboards import get_main_keyboard, get_main_keyboard_admin, get_application_keyboard, get_application_keyboard_with_skip, get_admin_keyboard, get_cancel_keyboard, get_empty_keyboard
 
 load_dotenv()
@@ -215,7 +215,65 @@ logger.info("Бот запущен и ожидает сообщения...")
 
 def main_loop_handler(user_id, msg):
     remember_user(user_id)
-    if user_states.get_state(user_id):
+    state = user_states.get_state(user_id)
+    if state == "waiting_admin_id":
+        if msg.lower() == "отмена":
+            user_states.set_state(user_id, None)
+            send_msg(user_id, "Отменено.", get_admin_keyboard())
+            return
+        try:
+            new_admin_id = int(msg)
+            if add_admin_id(new_admin_id):
+                send_msg(user_id, f"Админ {new_admin_id} добавлен.", get_admin_keyboard())
+            else:
+                send_msg(user_id, "Этот админ уже есть в списке.", get_admin_keyboard())
+        except ValueError:
+            send_msg(user_id, "Введите数字 ID пользователя или 'Отмена':", get_admin_keyboard())
+        user_states.set_state(user_id, None)
+        return
+    if state == "waiting_remove_admin_id":
+        if msg.lower() == "отмена":
+            user_states.set_state(user_id, None)
+            send_msg(user_id, "Отменено.", get_admin_keyboard())
+            return
+        try:
+            admin_id_to_remove = int(msg)
+            if remove_admin_id(admin_id_to_remove):
+                send_msg(user_id, f"Админ {admin_id_to_remove} удалён.", get_admin_keyboard())
+            else:
+                send_msg(user_id, "Этого админа нет в списке.", get_admin_keyboard())
+        except ValueError:
+            send_msg(user_id, "Введите ID пользователя или 'Отмена':", get_admin_keyboard())
+        user_states.set_state(user_id, None)
+        return
+    if state == "waiting_email":
+        if msg.lower() == "отмена":
+            user_states.set_state(user_id, None)
+            send_msg(user_id, "Отменено.", get_admin_keyboard())
+            return
+        email = msg.strip()
+        if "@" in email and "." in email:
+            if add_notification_email(email):
+                send_msg(user_id, f"Почта {email} добавлена.", get_admin_keyboard())
+            else:
+                send_msg(user_id, "Эта почта уже есть в списке.", get_admin_keyboard())
+        else:
+            send_msg(user_id, "Введите корректный email или 'Отмена':", get_admin_keyboard())
+        user_states.set_state(user_id, None)
+        return
+    if state == "waiting_remove_email":
+        if msg.lower() == "отмена":
+            user_states.set_state(user_id, None)
+            send_msg(user_id, "Отменено.", get_admin_keyboard())
+            return
+        email = msg.strip()
+        if remove_notification_email(email):
+            send_msg(user_id, f"Почта {email} удалена.", get_admin_keyboard())
+        else:
+            send_msg(user_id, "Этой почты нет в списке.", get_admin_keyboard())
+        user_states.set_state(user_id, None)
+        return
+    if state and state.startswith("waiting_"):
         handle_application(user_id, msg)
         return
     if msg == "hi":
@@ -237,6 +295,30 @@ def main_loop_handler(user_id, msg):
         send_known_users_to_admin(user_id)
     elif msg == "список почт":
         send_email_list_to_admin(user_id)
+    elif msg == "добавить админа":
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        else:
+            user_states.set_state(user_id, "waiting_admin_id")
+            send_msg(user_id, "Введите ID нового админа:", get_admin_keyboard())
+    elif msg == "удалить админа":
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        else:
+            user_states.set_state(user_id, "waiting_remove_admin_id")
+            send_msg(user_id, "Введите ID админа для удаления:", get_admin_keyboard())
+    elif msg == "добавить почту":
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        else:
+            user_states.set_state(user_id, "waiting_email")
+            send_msg(user_id, "Введите email для добавления:", get_admin_keyboard())
+    elif msg == "удалить почту":
+        if not is_admin(user_id):
+            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        else:
+            user_states.set_state(user_id, "waiting_remove_email")
+            send_msg(user_id, "Введите email для удаления:", get_admin_keyboard())
     elif msg == "админ" or msg == "панель админа":
         if not is_admin(user_id):
             send_msg(user_id, "У вас нет доступа к админ-панели.", get_main_keyboard_for_user(user_id))
