@@ -201,18 +201,27 @@ def get_admin_keyboard():
                 {
                     "action": {
                         "type": "text",
-                        "label": "Отмена"
+                        "label": "Назад"
                     },
-                    "color": "negative"
+                    "color": "default"
                 }
-            ],
+            ]
+        ]
+    }
+    return json.dumps(keyboard)
+
+
+def get_admin_input_keyboard():
+    keyboard = {
+        "one_time": False,
+        "buttons": [
             [
                 {
                     "action": {
                         "type": "text",
-                        "label": "Назад"
+                        "label": "Отмена"
                     },
-                    "color": "default"
+                    "color": "negative"
                 }
             ]
         ]
