@@ -339,12 +339,13 @@ class TestHandleApplication:
     def test_send_known_users_to_admin(self, mock_is_admin, mock_admin_kb, mock_send_msg):
         from main import send_known_users_to_admin
         from main import known_users
-        known_users.clear()
-        known_users[123] = "Иван Иванов"
+        known_users[710547454] = "Арсен Сосян"
+        known_users[540047989] = "Санёк Барабошин"
         mock_is_admin.return_value = True
         mock_admin_kb.return_value = 'admin_kb'
         send_known_users_to_admin(710547454)
-        mock_send_msg.assert_called_once_with(710547454, "Список пользователей:\n- Иван Иванов — ID: 123", 'admin_kb')
+        expected = "Список пользователей:\n- Арсен Сосян — ID: 710547454\n- Санёк Барабошин — ID: 540047989"
+        mock_send_msg.assert_called_once_with(710547454, expected, 'admin_kb')
 
 
 class TestSendReportToChat:

@@ -5,7 +5,7 @@ import vk_api
 from dotenv import load_dotenv
 from vk_api.longpoll import VkLongPoll, VkEventType
 from reports import get_applications, format_applications_text, send_email_report, send_new_application_email
-from recipients import get_admin_ids
+from recipients import get_admin_ids, get_notification_emails
 from keyboards import get_main_keyboard, get_main_keyboard_admin, get_application_keyboard, get_application_keyboard_with_skip, get_admin_keyboard, get_cancel_keyboard, get_empty_keyboard
 
 load_dotenv()
@@ -106,11 +106,39 @@ def format_known_users_text():
     return "\n".join(lines)
 
 
+def format_admin_list_text():
+    admin_ids = get_admin_ids(admin_id)
+    if not admin_ids:
+        return "Список админов пуст."
+    lines = ["Список пользователей:"]
+    for aid in admin_ids:
+        name = remember_user(int(aid))
+        lines.append(f"- {name} — ID: {aid}")
+    return "\n".join(lines)
+
+
+def format_email_list_text():
+    emails = get_notification_emails(os.getenv('EMAIL_TO'))
+    if not emails:
+        return "Список почт пуст."
+    lines = ["Список почт:"]
+    for email in emails:
+        lines.append(f"- {email}")
+    return "\n".join(lines)
+
+
+def send_email_list_to_admin(user_id):
+    if not is_admin(user_id):
+        send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
+        return
+    send_msg(user_id, format_email_list_text(), get_admin_keyboard())
+
+
 def send_known_users_to_admin(user_id):
     if not is_admin(user_id):
         send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
         return
-    send_msg(user_id, format_known_users_text(), get_admin_keyboard())
+    send_msg(user_id, format_admin_list_text(), get_admin_keyboard())
 
 
 def notify_admin_about_application(application):
@@ -207,6 +235,8 @@ def main_loop_handler(user_id, msg):
             send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_admin_keyboard())
     elif msg == "список пользователей":
         send_known_users_to_admin(user_id)
+    elif msg == "список почт":
+        send_email_list_to_admin(user_id)
     elif msg == "админ" or msg == "панель админа":
         if not is_admin(user_id):
             send_msg(user_id, "У вас нет доступа к админ-панели.", get_main_keyboard_for_user(user_id))

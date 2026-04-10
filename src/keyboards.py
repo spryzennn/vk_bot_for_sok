@@ -156,6 +156,15 @@ def get_admin_keyboard():
                 {
                     "action": {
                         "type": "text",
+                        "label": "Список почт"
+                    },
+                    "color": "primary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
                         "label": "Назад"
                     },
                     "color": "default"
