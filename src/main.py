@@ -223,12 +223,13 @@ def main_loop_handler(user_id, msg):
             return
         try:
             new_admin_id = int(msg)
+            admin_name = remember_user(new_admin_id)
             if add_admin_id(new_admin_id):
-                send_msg(user_id, f"Админ {new_admin_id} добавлен.", get_admin_keyboard())
+                send_msg(user_id, f"Админ {admin_name} добавлен.", get_admin_keyboard())
             else:
-                send_msg(user_id, "Этот админ уже есть в списке.", get_admin_keyboard())
+                send_msg(user_id, f"{admin_name} уже есть в списке админов.", get_admin_keyboard())
         except ValueError:
-            send_msg(user_id, "Введите数字 ID пользователя или 'Отмена':", get_admin_keyboard())
+            send_msg(user_id, "Введите ID пользователя или 'Отмена':", get_admin_keyboard())
         user_states.set_state(user_id, None)
         return
     if state == "waiting_remove_admin_id":
@@ -238,10 +239,11 @@ def main_loop_handler(user_id, msg):
             return
         try:
             admin_id_to_remove = int(msg)
+            admin_name = remember_user(admin_id_to_remove)
             if remove_admin_id(admin_id_to_remove):
-                send_msg(user_id, f"Админ {admin_id_to_remove} удалён.", get_admin_keyboard())
+                send_msg(user_id, f"Админ {admin_name} удалён.", get_admin_keyboard())
             else:
-                send_msg(user_id, "Этого админа нет в списке.", get_admin_keyboard())
+                send_msg(user_id, f"{admin_name} не находится в списке админов.", get_admin_keyboard())
         except ValueError:
             send_msg(user_id, "Введите ID пользователя или 'Отмена':", get_admin_keyboard())
         user_states.set_state(user_id, None)
