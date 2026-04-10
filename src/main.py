@@ -240,6 +240,10 @@ def main_loop_handler(user_id, msg):
             return
         try:
             admin_id_to_remove = int(msg)
+            if str(admin_id_to_remove) == str(admin_id):
+                send_msg(user_id, "Невозможно удалить главного админа.", get_admin_keyboard())
+                user_states.set_state(user_id, None)
+                return
             admin_name = remember_user(admin_id_to_remove)
             if remove_admin_id(admin_id_to_remove):
                 send_msg(user_id, f"Админ {admin_name} удалён.", get_admin_keyboard())
