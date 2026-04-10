@@ -23,6 +23,15 @@ def get_main_keyboard():
                 {
                     "action": {
                         "type": "text",
+                        "label": "Панель админа"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
                         "label": "Помощь"
                     },
                     "color": "default"
@@ -138,7 +147,7 @@ def get_admin_keyboard():
                 {
                     "action": {
                         "type": "text",
-                        "label": "Посмотреть заявки"
+                        "label": "Список пользователей"
                     },
                     "color": "primary"
                 }
@@ -147,9 +156,45 @@ def get_admin_keyboard():
                 {
                     "action": {
                         "type": "text",
-                        "label": "Отчет на почту"
+                        "label": "Список почт"
                     },
                     "color": "primary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Добавить админа"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Удалить админа"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Добавить почту"
+                    },
+                    "color": "secondary"
+                }
+            ],
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Удалить почту"
+                    },
+                    "color": "secondary"
                 }
             ],
             [
@@ -159,6 +204,24 @@ def get_admin_keyboard():
                         "label": "Назад"
                     },
                     "color": "default"
+                }
+            ]
+        ]
+    }
+    return json.dumps(keyboard)
+
+
+def get_admin_input_keyboard():
+    keyboard = {
+        "one_time": False,
+        "buttons": [
+            [
+                {
+                    "action": {
+                        "type": "text",
+                        "label": "Отмена"
+                    },
+                    "color": "negative"
                 }
             ]
         ]

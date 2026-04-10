@@ -1,6 +1,6 @@
 # VK Bot - Бот для работы с заявками
 
-Бот для VK, который принимает заявки от пользователей, сохраняет их в базу данных, отправляет отчеты на email и имеет админ-панель.
+Бот для VK, который принимает заявки от пользователей, хранит их в памяти приложения, отправляет отчеты на email и имеет админ-панель.
 
 ## Файлы проекта
 
@@ -24,8 +24,12 @@
 
 **Команды админа** (в панели админа):
 
-- `Посмотреть заявки` - показать последние 10 заявок
-- `Отчет на почту` - отправить отчет на email
+- `Список пользователей` - показать список админов (из файла admin_ids.txt и .env)
+- `Список почт` - показать список email для уведомлений
+- `Добавить админа` - добавить нового админа по VK ID
+- `Удалить админа` - удалить админа по VK ID
+- `Добавить почту` - добавить email для уведомлений
+- `Удалить почту` - удалить email из списка уведомлений
 - `Назад` - вернуться в главное меню
 
 ### src/keyboards.py
@@ -38,22 +42,10 @@
 - `get_main_keyboard_admin()` - главное меню с кнопкой админа (для админа)
 - `get_application_keyboard()` - клавиатура для процесса подачи заявки (только Отмена)
 - `get_application_keyboard_with_skip()` - клавиатура для процесса подачи заявки с кнопкой Пропустить (для примечания)
-- `get_admin_keyboard()` - панель админа (Посмотреть заявки, Отчет на почту, Назад)
+- `get_admin_keyboard()` - панель админа (Список пользователей, Список почт, Добавить/Удалить админа/почту, Назад)
+- `get_admin_input_keyboard()` - клавиатура с кнопкой Отмена (для режима ввода данных)
 - `get_cancel_keyboard()` - клавиатура с кнопкой отмены
 - `get_empty_keyboard()` - пустая клавиатура (скрыть кнопки)
-
-### src/database.py
-
-Работа с базой данных PostgreSQL.
-
-**Функции:**
-
-- `create_connection()` - создание подключения к БД
-- `Database` класс:
-  - `execute(query, params)` - выполнение запроса
-  - `fetch_one(query, params)` - получение одной строки
-  - `fetch_all(query, params)` - получение всех строк
-  - `close()` - закрытие подключения
 
 ### src/reports.py
 
@@ -61,10 +53,23 @@
 
 **Функции:**
 
-- `get_applications(limit)` - получение последних заявок из БД
+- `get_applications(limit)` - получение последних заявок из памяти приложения
 - `format_applications_text(applications)` - форматирование заявок в текстовый вид
 - `format_applications_html(applications)` - форматирование заявок в HTML для email
 - `send_email_report(to_email)` - отправка отчета на email
+
+### src/recipients.py
+
+Управление списками админов и email.
+
+**Функции:**
+
+- `get_admin_ids(default_admin_id)` - получение списка ID админов (из файла + .env)
+- `get_notification_emails(default_email)` - получение списка email (из файла + .env)
+- `add_admin_id(user_id)` - добавить админа в файл admin_ids.txt
+- `remove_admin_id(user_id)` - удалить админа из файла admin_ids.txt
+- `add_notification_email(email)` - добавить email в файл notification_emails.txt
+- `remove_notification_email(email)` - удалить email из файла notification_emails.txt
 
 ## Работа с проектом
 
@@ -75,15 +80,17 @@
 ```
 VK_TOKEN=токен_группы_vk
 ADMIN_ID=id_администратора_vk
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=имя_бд
-DB_USER=пользователь_бд
-DB_PASSWORD=пароль_бд
 EMAIL_TO=email_для_отчетов
 SMTP_USER=email_отправителя
 SMTP_PASSWORD=пароль_приложения
 ```
+
+Также можно указать нескольких получателей уведомлений в отдельных файлах:
+
+- [`config/admin_ids.txt`](config/admin_ids.txt) — список VK ID администраторов, по одному в строке
+- [`config/notification_emails.txt`](config/notification_emails.txt) — список email-адресов для уведомлений, по одному в строке
+
+Если эти файлы заполнены, новые заявки будут отправляться всем указанным администраторам и на все указанные email.
 
 ### 2. Установить библиотеки
 
@@ -91,18 +98,7 @@ SMTP_PASSWORD=пароль_приложения
 pip install -r requirements.txt
 ```
 
-### 3. Создать базу данных
-
-```sql
-CREATE TABLE IF NOT EXISTS applications (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255),
-    phone VARCHAR(50),
-    note TEXT
-);
-```
-
-### 4. Запустить проект
+### 3. Запустить проект
 
 ```bash
 cd src

@@ -3,34 +3,30 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from database import create_connection
+from recipients import get_notification_emails
 
 logger = logging.getLogger(__name__)
 
+_applications_storage = []
+
+
+def set_applications_storage(storage):
+    global _applications_storage
+    _applications_storage = storage
+
 def get_applications(limit=10):
-    conn = create_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, name, phone, note FROM applications ORDER BY id DESC LIMIT %s",
-                (limit,)
-            )
-            return cur.fetchall()
-    finally:
-        conn.close()
+    items = list(reversed(_applications_storage))[:limit]
+    return [
+        (item["id"], item["name"], item["phone"], item["note"])
+        for item in items
+    ]
 
 def get_latest_application():
     """Получить последнюю заявку"""
-    conn = create_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, name, phone, note FROM applications ORDER BY id DESC LIMIT 1"
-            )
-            result = cur.fetchone()
-            return [result] if result else []
-    finally:
-        conn.close()
+    if not _applications_storage:
+        return []
+    item = _applications_storage[-1]
+    return [(item["id"], item["name"], item["phone"], item["note"])]
 
 def format_applications_text(applications):
     if not applications:
@@ -101,9 +97,9 @@ def format_applications_html(applications):
     return html
 
 def send_email_report(to_email=None):
-    to_email = to_email or os.getenv('EMAIL_TO')
-    if not to_email:
-        logger.error("EMAIL_TO не задан в .env")
+    recipients = [to_email] if to_email else get_notification_emails(os.getenv('EMAIL_TO'))
+    if not recipients:
+        logger.error("Не заданы получатели email")
         return False
     smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
     smtp_user = os.getenv('SMTP_USER')
@@ -118,7 +114,7 @@ def send_email_report(to_email=None):
         msg = MIMEMultipart('alternative')
         msg['Subject'] = 'Отчёт по заявкам'
         msg['From'] = smtp_user
-        msg['To'] = to_email
+        msg['To'] = ", ".join(recipients)
         msg.attach(text_part)
         msg.attach(html_part)
         server = smtplib.SMTP(smtp_server, 587)
@@ -126,17 +122,17 @@ def send_email_report(to_email=None):
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        logger.info(f"Email отправлен на {to_email}")
+        logger.info(f"Email отправлен на {', '.join(recipients)}")
         return True
     except Exception:
         logger.exception("Ошибка отправки email")
         return False
 
-def send_new_application_email(to_email=None):
+def send_new_application_email(application=None, to_email=None):
     """Отправить на почту только что полученную заявку"""
-    to_email = to_email or os.getenv('EMAIL_TO')
-    if not to_email:
-        logger.error("EMAIL_TO не задан в .env")
+    recipients = [to_email] if to_email else get_notification_emails(os.getenv('EMAIL_TO'))
+    if not recipients:
+        logger.error("Не заданы получатели email")
         return False
     smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
     smtp_user = os.getenv('SMTP_USER')
@@ -145,16 +141,33 @@ def send_new_application_email(to_email=None):
         logger.error("SMTP_USER или SMTP_PASSWORD не заданы")
         return False
     try:
-        application = get_latest_application()
-        if not application:
+        application_data = application
+        if application_data is None:
+            latest_applications = get_latest_application()
+            if not latest_applications:
+                logger.warning("Нет заявок для отправки")
+                return False
+            application_data = {
+                "id": latest_applications[0][0],
+                "name": latest_applications[0][1],
+                "phone": latest_applications[0][2],
+                "note": latest_applications[0][3],
+            }
+        application_rows = [(
+            application_data["id"],
+            application_data["name"],
+            application_data["phone"],
+            application_data["note"],
+        )]
+        if not application_rows:
             logger.warning("Нет заявок для отправки")
             return False
-        text_part = MIMEText(format_applications_text(application), 'plain')
-        html_part = MIMEText(format_applications_html(application), 'html')
+        text_part = MIMEText(format_applications_text(application_rows), 'plain')
+        html_part = MIMEText(format_applications_html(application_rows), 'html')
         msg = MIMEMultipart('alternative')
         msg['Subject'] = 'Новая заявка!'
         msg['From'] = smtp_user
-        msg['To'] = to_email
+        msg['To'] = ", ".join(recipients)
         msg.attach(text_part)
         msg.attach(html_part)
         server = smtplib.SMTP(smtp_server, 587)
@@ -162,7 +175,7 @@ def send_new_application_email(to_email=None):
         server.login(smtp_user, smtp_pass)
         server.send_message(msg)
         server.quit()
-        logger.info(f"Email о новой заявке отправлен на {to_email}")
+        logger.info(f"Email о новой заявке отправлен на {', '.join(recipients)}")
         return True
     except Exception:
         logger.exception("Ошибка отправки email о новой заявке")
