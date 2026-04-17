@@ -1,106 +1,136 @@
-# VK Bot - Бот для работы с заявками
+# VK-bot for SOK
 
-Бот для VK, который принимает заявки от пользователей, хранит их в памяти приложения, отправляет отчеты на email и имеет админ-панель.
+VK-бот для удобного управления заявками с интеграцией RESTful-сервисом, веб-интерфейсом с использованием RabbitMQ.
 
-## Файлы проекта
+---
 
-### src/main.py
-
-Главный файл бота - точка входа в приложение.
-
-**Функции:**
-
-- `UserState` - класс для хранения состояния пользователя (в процессе заполнения заявки)
-- `send_msg(user_id, text, keyboard)` - отправка сообщения пользователю с опциональной клавиатурой
-- `send_report_to_chat(user_id)` - отправка последних 10 заявок в чат
-- `handle_application(user_id, msg)` - обработка процесса заполнения заявки (имя -> телефон -> примечание)
-- Главный цикл `for event in longpoll.listen()` - обработка входящих сообщений
-
-**Команды бота:**
-
-- `Оставить заявку` - начать заполнение заявки
-- `Помощь` - показать список команд
-- `Панель админа` - открыть панель администратора (только для админа)
-
-**Команды админа** (в панели админа):
-
-- `Список пользователей` - показать список админов (из файла admin_ids.txt и .env)
-- `Список почт` - показать список email для уведомлений
-- `Добавить админа` - добавить нового админа по VK ID
-- `Удалить админа` - удалить админа по VK ID
-- `Добавить почту` - добавить email для уведомлений
-- `Удалить почту` - удалить email из списка уведомлений
-- `Назад` - вернуться в главное меню
-
-### src/keyboards.py
-
-Файл с клавиатурами для VK.
-
-**Функции:**
-
-- `get_main_keyboard()` - главное меню (для обычных пользователей)
-- `get_main_keyboard_admin()` - главное меню с кнопкой админа (для админа)
-- `get_application_keyboard()` - клавиатура для процесса подачи заявки (только Отмена)
-- `get_application_keyboard_with_skip()` - клавиатура для процесса подачи заявки с кнопкой Пропустить (для примечания)
-- `get_admin_keyboard()` - панель админа (Список пользователей, Список почт, Добавить/Удалить админа/почту, Назад)
-- `get_admin_input_keyboard()` - клавиатура с кнопкой Отмена (для режима ввода данных)
-- `get_cancel_keyboard()` - клавиатура с кнопкой отмены
-- `get_empty_keyboard()` - пустая клавиатура (скрыть кнопки)
-
-### src/reports.py
-
-Формирование и отправка отчетов.
-
-**Функции:**
-
-- `get_applications(limit)` - получение последних заявок из памяти приложения
-- `format_applications_text(applications)` - форматирование заявок в текстовый вид
-- `format_applications_html(applications)` - форматирование заявок в HTML для email
-- `send_email_report(to_email)` - отправка отчета на email
-
-### src/recipients.py
-
-Управление списками админов и email.
-
-**Функции:**
-
-- `get_admin_ids(default_admin_id)` - получение списка ID админов (из файла + .env)
-- `get_notification_emails(default_email)` - получение списка email (из файла + .env)
-- `add_admin_id(user_id)` - добавить админа в файл admin_ids.txt
-- `remove_admin_id(user_id)` - удалить админа из файла admin_ids.txt
-- `add_notification_email(email)` - добавить email в файл notification_emails.txt
-- `remove_notification_email(email)` - удалить email из файла notification_emails.txt
-
-## Работа с проектом
-
-### 1. Создать .env файл
-
-Создать в корневой папке файл `.env` со следующими переменными:
+## Структура проекта
 
 ```
-VK_TOKEN=токен_группы_vk
-ADMIN_ID=id_администратора_vk
-EMAIL_TO=email_для_отчетов
-SMTP_USER=email_отправителя
-SMTP_PASSWORD=пароль_приложения
+ApplicationsPublisherRabbitMQ/
+├── ApplicationsPublisher/          # Spring Boot приложение (Java)
+│   ├── src/main/java/com/example/ApplicationsPublisher/
+│   │   ├── controller/              # REST контроллеры
+│   │   ├── service/                 # Бизнес-логика
+│   │   └── ApplicationsPublisherApplication.java
+│   ├── src/main/resources/
+│   │   ├── application.yaml         # Конфигурация Spring Boot
+│   │   └── application.properties
+│   └── pom.xml                      # Maven зависимости
+│
+├── vk_bot_for_sok/                  # VK бот (Python)
+│   ├── src/
+│   │   ├── main.py                  # Главный файл бота
+│   │   ├── rabbitmq_listener.py     # Прослушивание очередей RabbitMQ
+│   │   ├── reports.py               # Генерация отчетов
+│   │   ├── recipients.py            # Получатели уведомлений
+│   │   ├── keyboards.py             # Клавиатуры VK
+│   │   └── static/                  # Статические файлы для сайта (HTML, CSS, JS)
+│   ├── config/
+│   │   ├── admin_ids.txt            # ID администраторов (по одному на строке)
+│   │   └── notification_emails.txt  # Email для уведомлений (по одному на строке)
+│   ├── tests/                       # Модульные тесты
+│   ├── requirements.txt             # Python зависимости
+│   └── .env                         # Переменные окружения
+│
+└── README.md
 ```
 
-Также можно указать нескольких получателей уведомлений в отдельных файлах:
+---
 
-- [`config/admin_ids.txt`](config/admin_ids.txt) — список VK ID администраторов, по одному в строке
-- [`config/notification_emails.txt`](config/notification_emails.txt) — список email-адресов для уведомлений, по одному в строке
+## Запуск проекта
 
-Если эти файлы заполнены, новые заявки будут отправляться всем указанным администраторам и на все указанные email.
-
-### 2. Установить библиотеки
+### 1. Запуск RabbitMQ
 
 ```bash
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 -e RABBITMQ_DEFAULT_USER=user -e RABBITMQ_DEFAULT_PASS=password rabbitmq:3-management
+```
+
+- **AMQP порт**: 5672
+- **Management UI**: http://localhost:15672 (логин: user, пароль: password)
+
+---
+
+### 2. Запуск ApplicationsPublisher (Spring Boot)
+
+Требования: **Java 21**, **Maven**
+
+```bash
+cd ApplicationsPublisher
+mvn spring-boot:run
+```
+
+Приложение будет доступно на **http://localhost:8080**
+
+---
+
+### 3. Запуск сайта-интерфейса (Python HTTP Server)
+
+Веб-интерфейс для отображения статусов заявок:
+
+```bash
+cd vk_bot_for_sok/src
+python -m http.server 8000
+```
+
+Сайт будет доступен на **http://localhost:8000**
+
+---
+
+### 4. Запуск VK бота (Python)
+
+Требования: **Python 3.10+**
+
+```bash
+cd vk_bot_for_sok
 pip install -r requirements.txt
+python src/main.py
 ```
 
-### 3. Запустить проект
+---
 
-```bash
-cd src
-python main.py
+## Настройка конфигурации
+
+### Файлы конфигурации
+
+Создайте файлы в `vk_bot_for_sok/config/`:
+
+- **admin_ids.txt** — список ID администраторов VK (по одному на строке)
+- **notification_emails.txt** — email адреса для уведомлений (по одному на строке)
+
+### Переменные окружения
+
+Настройте `vk_bot_for_sok/.env`:
+
+```env
+VK_TOKEN=your_vk_token
+ADMIN_ID=main_admin_id
+
+SMTP_SERVER=smtp.gmail.com
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+EMAIL_TO=recipient@gmail.com
+
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=user
+RABBITMQ_PASSWORD=password
+```
+
+### Конфигурация Spring Boot
+
+Файл `ApplicationsPublisher/src/main/resources/application.yaml`:
+
+```yaml
+spring:
+  application:
+    name: ApplicationsPublisher
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: user
+    password: password
+
+server:
+  port: 8080
 ```
