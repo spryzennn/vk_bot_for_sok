@@ -82,6 +82,22 @@ class TestKeyboards:
         keyboard = json.loads(result)
         
         assert keyboard['one_time'] is False
-        assert len(keyboard['buttons']) == 2
+        assert len(keyboard['buttons']) == 7
         assert keyboard['buttons'][0][0]['action']['label'] == 'Список пользователей'
-        assert keyboard['buttons'][1][0]['action']['label'] == 'Назад'
+        assert keyboard['buttons'][1][0]['action']['label'] == 'Список почт'
+        assert keyboard['buttons'][2][0]['action']['label'] == 'Добавить админа'
+        assert keyboard['buttons'][3][0]['action']['label'] == 'Удалить админа'
+        assert keyboard['buttons'][4][0]['action']['label'] == 'Добавить почту'
+        assert keyboard['buttons'][5][0]['action']['label'] == 'Удалить почту'
+        assert keyboard['buttons'][6][0]['action']['label'] == 'Назад'
+
+    def test_get_admin_input_keyboard(self):
+        from keyboards import get_admin_input_keyboard
+        result = get_admin_input_keyboard()
+        
+        keyboard = json.loads(result)
+        
+        assert keyboard['one_time'] is False
+        assert len(keyboard['buttons']) == 1
+        assert keyboard['buttons'][0][0]['action']['label'] == 'Отмена'
+        assert keyboard['buttons'][0][0]['color'] == 'negative'

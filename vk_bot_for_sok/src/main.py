@@ -16,7 +16,7 @@ vk_token = os.getenv('VK_TOKEN')
 admin_id = os.getenv('ADMIN_ID', '710547454')
 vk_session = vk_api.VkApi(token=vk_token)
 session_api = vk_session.get_api()
-longpoll = VkLongPoll(vk_session)
+
 
 class UserState:
     def __init__(self):
@@ -41,17 +41,21 @@ class UserState:
             self.data[user_id] = {}
         self.data[user_id][key] = value
 
+
 user_states = UserState()
 applications = []
 known_users = {}
 
+
 def is_admin(user_id):
     return str(user_id) in get_admin_ids(admin_id)
+
 
 def get_main_keyboard_for_user(user_id):
     if is_admin(user_id):
         return get_main_keyboard_admin()
     return get_main_keyboard()
+
 
 def send_msg(user_id, text, keyboard=None):
     try:
@@ -65,6 +69,7 @@ def send_msg(user_id, text, keyboard=None):
         vk_session.method("messages.send", params)
     except Exception as e:
         logger.error(f"Ошибка отправки сообщения пользователю {user_id}: {e}")
+
 
 def send_report_to_chat(user_id):
     if admin_id and str(user_id) != str(admin_id):
@@ -154,6 +159,7 @@ def notify_admin_about_application(application):
     for current_admin_id in admin_ids:
         send_msg(current_admin_id, text, get_main_keyboard_for_user(current_admin_id))
 
+
 def process_application_submission(user_id, application):
     threading.Thread(target=send_new_application_email, args=(application,), daemon=True).start()
     notify_admin_about_application(application)
@@ -209,8 +215,6 @@ def handle_application(user_id, msg):
         applications.append(application)
         user_states.set_state(user_id, None)
         process_application_submission(user_id, application)
-
-logger.info("Бот запущен и ожидает сообщения...")
 
 
 def main_loop_handler(user_id, msg):
@@ -282,8 +286,6 @@ def main_loop_handler(user_id, msg):
             send_msg(user_id, "Этой почты нет в списке.", get_admin_keyboard())
         user_states.set_state(user_id, None)
         return
-        user_states.set_state(user_id, None)
-        return
     if state and state.startswith("waiting_"):
         handle_application(user_id, msg)
         return
@@ -342,8 +344,8 @@ def main_loop_handler(user_id, msg):
             help_text = (
                 "Доступные команды:\n\n"
                 "Оставить заявку - подать заявку\n"
-                "Панель админа - открыть меню администратора\n"
-                "Список пользователей - показать всех пользователей, писавших боту\n"
+                "Посмотреть заявки - показать последние 10 заявок\n"
+                "Отчет на почту - отправить отчет на email\n"
                 "Помощь - это сообщение"
             )
         else:
@@ -356,19 +358,22 @@ def main_loop_handler(user_id, msg):
     else:
         send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
 
-while True:
-    try:
-        for event in longpoll.listen():
-            if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-                msg = event.text.lower().strip()
-                user_id = event.user_id
-                main_loop_handler(user_id, msg)
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
-        break
-    except Exception as e:
-        logger.exception(f"Ошибка в цикле: {e}")
-        logger.info("Переподключение через 5 секунд...")
-        import time
-        time.sleep(5)
 
+if __name__ == "__main__":
+    longpoll = VkLongPoll(vk_session)
+    logger.info("Бот запущен и ожидает сообщений...")
+    while True:
+        try:
+            for event in longpoll.listen():
+                if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                    msg = event.text.lower().strip()
+                    user_id = event.user_id
+                    main_loop_handler(user_id, msg)
+        except KeyboardInterrupt:
+            logger.info("Бот остановлен пользователем")
+            break
+        except Exception as e:
+            logger.exception(f"Ошибка в цикле: {e}")
+            logger.info("Переподключение через 5 секунд...")
+            import time
+            time.sleep(5)
