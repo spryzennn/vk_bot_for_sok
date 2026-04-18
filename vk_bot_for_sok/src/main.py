@@ -356,9 +356,19 @@ def main_loop_handler(user_id, msg):
     else:
         send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
 
-for event in longpoll.listen():
-    if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-        msg = event.text.lower().strip()
-        user_id = event.user_id
-        main_loop_handler(user_id, msg)
+while True:
+    try:
+        for event in longpoll.listen():
+            if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                msg = event.text.lower().strip()
+                user_id = event.user_id
+                main_loop_handler(user_id, msg)
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен пользователем")
+        break
+    except Exception as e:
+        logger.exception(f"Ошибка в цикле: {e}")
+        logger.info("Переподключение через 5 секунд...")
+        import time
+        time.sleep(5)
 
