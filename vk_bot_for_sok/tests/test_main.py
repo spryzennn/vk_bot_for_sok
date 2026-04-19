@@ -8,6 +8,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 os.environ['ADMIN_ID'] = '123456789'
 
 
+@pytest.fixture(autouse=True)
+def reset_globals():
+    from main import user_states, applications, known_users
+    user_states.states.clear()
+    user_states.data.clear()
+    applications.clear()
+    known_users.clear()
+    yield
+    user_states.states.clear()
+    user_states.data.clear()
+    applications.clear()
+    known_users.clear()
+
+
 class TestUserState:
     def test_user_state_init(self):
         from main import UserState
@@ -87,10 +101,10 @@ class TestMainFunctions:
         result = is_admin(987654321)
         assert result is False
 
-    @patch('os.getenv')
-    def test_is_admin_no_admin_id(self, mock_getenv):
+    @patch('main.get_admin_ids')
+    def test_is_admin_no_admin_id(self, mock_get_admin_ids):
         from main import is_admin
-        mock_getenv.return_value = None
+        mock_get_admin_ids.return_value = []
         result = is_admin(123456789)
         assert result is False
 
@@ -168,6 +182,86 @@ class TestMainFunctions:
         assert "Иван Иванов — ID: 123" in result
         assert "Петр Петров — ID: 456" in result
 
+    # --- format_admin_list_text and format_email_list_text ---
+    def test_format_admin_list_text_empty(self):
+        with patch('main.get_admin_ids', return_value=[]), \
+             patch('main.remember_user') as mock_remember:
+            from main import format_admin_list_text
+            result = format_admin_list_text()
+            assert result == "Список админов пуст."
+            mock_remember.assert_not_called()
+
+    def test_format_admin_list_text_with_admins(self):
+        with patch('main.get_admin_ids', return_value=['123', '456']), \
+             patch('main.remember_user', side_effect=lambda aid: f"Admin {aid}"):
+            from main import format_admin_list_text
+            result = format_admin_list_text()
+            expected = "Список пользователей:\n- Admin 123 — ID: 123\n- Admin 456 — ID: 456"
+            assert result == expected
+
+    def test_format_email_list_text_empty(self):
+        with patch('main.get_notification_emails', return_value=[]):
+            from main import format_email_list_text
+            result = format_email_list_text()
+            assert result == "Список почт пуст."
+
+    def test_format_email_list_text_with_emails(self):
+        with patch('main.get_notification_emails', return_value=['a@example.com', 'b@test.org']):
+            from main import format_email_list_text
+            result = format_email_list_text()
+            expected = "Список почт:\n- a@example.com\n- b@test.org"
+            assert result == expected
+
+    # --- send_email_list_to_admin ---
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.is_admin')
+    def test_send_email_list_to_admin_non_admin(self, mock_is_admin, mock_get_kb, mock_send_msg):
+        from main import send_email_list_to_admin
+        mock_is_admin.return_value = False
+        mock_get_kb.return_value = 'user_kb'
+        send_email_list_to_admin(123)
+        mock_send_msg.assert_called_once_with(123, "У вас нет доступа к этой команде.", 'user_kb')
+
+    @patch('main.get_admin_keyboard')
+    @patch('main.send_msg')
+    @patch('main.format_email_list_text')
+    @patch('main.is_admin')
+    def test_send_email_list_to_admin_admin(self, mock_is_admin, mock_format, mock_send_msg, mock_get_admin_kb):
+        from main import send_email_list_to_admin
+        mock_is_admin.return_value = True
+        mock_format.return_value = "Email list text"
+        mock_get_admin_kb.return_value = 'admin_kb'
+        send_email_list_to_admin(123)
+        mock_send_msg.assert_called_once_with(123, "Email list text", 'admin_kb')
+
+    # --- send_known_users_to_admin (admin branch) ---
+    @patch('main.get_admin_keyboard')
+    @patch('main.send_msg')
+    @patch('main.format_admin_list_text')
+    @patch('main.is_admin')
+    def test_send_known_users_to_admin_admin(self, mock_is_admin, mock_format, mock_send_msg, mock_get_admin_kb):
+        from main import send_known_users_to_admin
+        mock_is_admin.return_value = True
+        mock_format.return_value = "Admin list text"
+        mock_get_admin_kb.return_value = 'admin_kb'
+        send_known_users_to_admin(123)
+        mock_send_msg.assert_called_once_with(123, "Admin list text", 'admin_kb')
+
+    # --- remember_user exception handling ---
+    @patch('main.vk_session')
+    @patch('main.logger')
+    def test_remember_user_exception(self, mock_logger, mock_vk_session):
+        from main import remember_user
+        from main import known_users
+        known_users.clear()
+        mock_vk_session.method.side_effect = Exception("API error")
+        user_id = 123
+        result = remember_user(user_id)
+        assert result == f"Пользователь {user_id}"
+        assert known_users[user_id] == f"Пользователь {user_id}"
+        mock_logger.error.assert_called_once()
+
 
 class TestHandleApplication:
     
@@ -242,16 +336,18 @@ class TestHandleApplication:
         handle_application(123, "отмена")
         assert user_states.get_state(123) is None
 
+    @patch('main.get_admin_ids')
     @patch('main.logger')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
     @patch('main.get_application_keyboard_with_skip')
     @patch('main.send_new_application_email')
-    def test_handle_application_waiting_note_with_note(self, mock_email, mock_kb, mock_main_kb, mock_send_msg, mock_logger):
+    def test_handle_application_waiting_note_with_note(self, mock_email, mock_kb, mock_main_kb, mock_send_msg, mock_logger, mock_get_admin_ids):
         from main import handle_application
         from main import applications
         from main import user_states
         applications.clear()
+        mock_get_admin_ids.return_value = ['123456789']
         user_states.set_state(123, "waiting_note")
         user_states.set_data(123, "name", "John")
         user_states.set_data(123, "phone", "+123")
@@ -283,10 +379,12 @@ class TestHandleApplication:
         assert len(applications) == 1
         assert applications[0]["note"] == ""
 
+    @patch('main.get_admin_ids')
     @patch('main.send_msg')
     @patch('main.get_main_keyboard_for_user')
-    def test_notify_admin_about_application(self, mock_main_kb, mock_send_msg):
+    def test_notify_admin_about_application(self, mock_main_kb, mock_send_msg, mock_get_admin_ids):
         from main import notify_admin_about_application
+        mock_get_admin_ids.return_value = ['710547454']
         application = {
             "id": 1,
             "name": "John",
@@ -333,18 +431,19 @@ class TestHandleApplication:
         )
         mock_logger.info.assert_called_once()
 
+    @patch('main.remember_user')
+    @patch('main.get_admin_ids')
+    @patch('main.is_admin')
     @patch('main.send_msg')
     @patch('main.get_admin_keyboard')
-    @patch('main.is_admin')
-    def test_send_known_users_to_admin(self, mock_is_admin, mock_admin_kb, mock_send_msg):
+    def test_send_known_users_to_admin(self, mock_get_admin_kb, mock_send_msg, mock_is_admin, mock_get_admin_ids, mock_remember_user):
         from main import send_known_users_to_admin
-        from main import known_users
-        known_users[710547454] = "Арсен Сосян"
-        known_users[540047989] = "Санёк Барабошин"
         mock_is_admin.return_value = True
-        mock_admin_kb.return_value = 'admin_kb'
+        mock_get_admin_kb.return_value = 'admin_kb'
+        mock_get_admin_ids.return_value = ['710547454', '540047989']
+        mock_remember_user.side_effect = lambda aid: f"User {aid}"
         send_known_users_to_admin(710547454)
-        expected = "Список пользователей:\n- Арсен Сосян — ID: 710547454\n- Санёк Барабошин — ID: 540047989"
+        expected = "Список пользователей:\n- User 710547454 — ID: 710547454\n- User 540047989 — ID: 540047989"
         mock_send_msg.assert_called_once_with(710547454, expected, 'admin_kb')
 
 
@@ -360,6 +459,7 @@ class TestSendReportToChat:
         send_report_to_chat(123)
         mock_send_msg.assert_called_once_with(123, "У вас нет доступа к этой команде.", 'user_kb')
 
+    @patch('main.admin_id', '123')
     @patch('main.send_msg')
     @patch('main.format_applications_text')
     @patch('main.get_applications')
@@ -372,6 +472,7 @@ class TestSendReportToChat:
         send_report_to_chat(123)
         mock_send_msg.assert_called_once_with(123, "Report text")
 
+    @patch('main.admin_id', '123')
     @patch('main.send_msg')
     @patch('main.get_applications')
     @patch('main.is_admin')
@@ -384,6 +485,7 @@ class TestSendReportToChat:
         mock_logger.exception.assert_called_once()
         mock_send_msg.assert_called_once_with(123, "Не удалось получить заявки. Попробуйте позже.")
 
+    @patch('main.admin_id', '123')
     @patch('main.send_msg')
     @patch('main.get_applications')
     @patch('main.is_admin')
@@ -461,17 +563,337 @@ class TestMainLoopCommands:
         mock_is_admin.return_value = False
         mock_get_kb.return_value = 'user_kb'
 
-    @patch('main.remember_user')
     @patch('main.send_known_users_to_admin')
     @patch('main.user_states.get_state')
-    def test_users_list_command(self, mock_get_state, mock_send_users, mock_remember_user):
+    def test_users_list_command_admin(self, mock_get_state, mock_send_users):
         from main import main_loop_handler
         mock_get_state.return_value = None
         main_loop_handler(710547454, 'список пользователей')
         mock_send_users.assert_called_once_with(710547454)
+
+    @patch('main.is_admin')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.user_states.get_state')
+    def test_users_list_command_non_admin(self, mock_get_state, mock_get_kb, mock_send_msg, mock_is_admin):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        mock_is_admin.return_value = False
+        mock_get_kb.return_value = 'user_kb'
+        
+        main_loop_handler(123, 'список пользователей')
+        mock_send_msg.assert_called_once_with(123, 'У вас нет доступа к этой команде.', 'user_kb')
+
+    @patch('threading.Thread')
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.remember_user')
+    @patch('main.add_admin_id')
+    @patch('main.user_states.get_state')
+    def test_waiting_admin_id_success(self, mock_get_state, mock_add_admin, mock_remember, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_admin_id"
+        mock_add_admin.return_value = True
+        mock_remember.return_value = "New Admin"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "999999")
+
+        mock_add_admin.assert_called_once_with(999999)
+        mock_remember.assert_called_once_with(999999)
+        mock_send_msg.assert_called_once_with(123, "Админ New Admin добавлен.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.remember_user')
+    @patch('main.add_admin_id')
+    @patch('main.user_states.get_state')
+    def test_waiting_admin_id_duplicate(self, mock_get_state, mock_add_admin, mock_remember, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_admin_id"
+        mock_add_admin.return_value = False  # already exists
+        mock_remember.return_value = "Existing Admin"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "999999")
+
+        mock_send_msg.assert_called_once_with(123, "Existing Admin уже есть в списке админов.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_input_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_admin_id_invalid_input(self, mock_get_state, mock_get_input_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_admin_id"
+        mock_get_input_kb.return_value = 'input_kb'
+
+        main_loop_handler(123, "не число")
+
+        mock_send_msg.assert_called_once_with(123, "Введите ID пользователя или 'Отмена':", 'input_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_admin_id_cancel(self, mock_get_state, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_admin_id"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "отмена")
+
+        mock_send_msg.assert_called_once_with(123, "Отменено.", 'admin_kb')
+
+    # --- waiting_remove_admin_id ---
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.remember_user')
+    @patch('main.remove_admin_id')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_admin_id_success(self, mock_get_state, mock_remove_admin, mock_remember, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_admin_id"
+        mock_remove_admin.return_value = True
+        mock_remember.return_value = "Admin To Remove"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "999999")
+
+        mock_remove_admin.assert_called_once_with(999999)
+        mock_send_msg.assert_called_once_with(123, "Админ Admin To Remove удалён.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.remember_user')
+    @patch('main.remove_admin_id')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_admin_id_not_found(self, mock_get_state, mock_remove_admin, mock_remember, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_admin_id"
+        mock_remove_admin.return_value = False
+        mock_remember.return_value = "Nonexistent"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "999999")
+
+        mock_send_msg.assert_called_once_with(123, "Nonexistent не находится в списке админов.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_admin_id_try_remove_main_admin(self, mock_get_state, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler, admin_id
+        mock_get_state.return_value = "waiting_remove_admin_id"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, str(admin_id))
+
+        mock_send_msg.assert_called_once_with(123, "Невозможно удалить главного админа.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_input_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_admin_id_invalid_input(self, mock_get_state, mock_get_input_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_admin_id"
+        mock_get_input_kb.return_value = 'input_kb'
+
+        main_loop_handler(123, "abc")
+
+        mock_send_msg.assert_called_once_with(123, "Введите ID пользователя или 'Отмена':", 'input_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_admin_id_cancel(self, mock_get_state, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_admin_id"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "отмена")
+
+        mock_send_msg.assert_called_once_with(123, "Отменено.", 'admin_kb')
+
+    # --- waiting_email ---
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.add_notification_email')
+    @patch('main.user_states.get_state')
+    def test_waiting_email_add_success(self, mock_get_state, mock_add_email, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_email"
+        mock_add_email.return_value = True
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "new@example.com")
+
+        mock_add_email.assert_called_once_with("new@example.com")
+        mock_send_msg.assert_called_once_with(123, "Почта new@example.com добавлена.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.add_notification_email')
+    @patch('main.user_states.get_state')
+    def test_waiting_email_duplicate(self, mock_get_state, mock_add_email, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_email"
+        mock_add_email.return_value = False
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "existing@example.com")
+
+        mock_send_msg.assert_called_once_with(123, "Эта почта уже есть в списке.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_input_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_email_invalid_format(self, mock_get_state, mock_get_input_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_email"
+        mock_get_input_kb.return_value = 'input_kb'
+
+        main_loop_handler(123, "invalid-email")
+
+        mock_send_msg.assert_called_once_with(123, "Введите корректный email или 'Отмена':", 'input_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_email_cancel(self, mock_get_state, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_email"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "отмена")
+
+        mock_send_msg.assert_called_once_with(123, "Отменено.", 'admin_kb')
+
+    # --- waiting_remove_email ---
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.remove_notification_email')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_email_success(self, mock_get_state, mock_remove_email, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_email"
+        mock_remove_email.return_value = True
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "remove@example.com")
+
+        mock_remove_email.assert_called_once_with("remove@example.com")
+        mock_send_msg.assert_called_once_with(123, "Почта remove@example.com удалена.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.remove_notification_email')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_email_not_found(self, mock_get_state, mock_remove_email, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_email"
+        mock_remove_email.return_value = False
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "nonexistent@example.com")
+
+        mock_send_msg.assert_called_once_with(123, "Этой почты нет в списке.", 'admin_kb')
+
+    @patch('main.send_msg')
+    @patch('main.get_admin_keyboard')
+    @patch('main.user_states.get_state')
+    def test_waiting_remove_email_cancel(self, mock_get_state, mock_get_admin_kb, mock_send_msg):
+        from main import main_loop_handler
+        mock_get_state.return_value = "waiting_remove_email"
+        mock_get_admin_kb.return_value = 'admin_kb'
+
+        main_loop_handler(123, "отмена")
+
+        mock_send_msg.assert_called_once_with(123, "Отменено.", 'admin_kb')
+
+
+class TestMainLoopCommands:
+    @patch('main.remember_user')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.user_states.get_state')
+    def test_hi_command(self, mock_get_state, mock_get_kb, mock_send_msg, mock_remember_user):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        mock_get_kb.return_value = 'main_kb'
+        
+        with patch('main.handle_application') as mock_handle:
+            main_loop_handler(123, 'hi')
+            mock_send_msg.assert_called_once_with(123, 'Привет! Я бот для работы с заявками. Выберите действие:', 'main_kb')
+            mock_handle.assert_not_called()
+
+    @patch('main.remember_user')
+    @patch('main.handle_application')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.user_states.get_state')
+    def test_application_command(self, mock_get_state, mock_get_kb, mock_send_msg, mock_handle, mock_remember_user):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        mock_get_kb.return_value = 'main_kb'
+        
+        main_loop_handler(123, 'заявка')
+        mock_handle.assert_called_once_with(123, None)
+        
+        main_loop_handler(123, 'оставить заявку')
+        assert mock_handle.call_count == 2
+
+    @patch('main.remember_user')
+    @patch('main.send_report_to_chat')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.is_admin')
+    @patch('main.user_states.get_state')
+    def test_report_command_admin(self, mock_get_state, mock_is_admin, mock_get_kb, mock_send_msg, mock_send_report, mock_remember_user):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        mock_is_admin.return_value = True
         
         main_loop_handler(123, 'отчет')
-        mock_send_report.assert_not_called()
+        mock_send_report.assert_called_once_with(123)
+        
+        main_loop_handler(123, 'заявки')
+        main_loop_handler(123, 'посмотреть заявки')
+        assert mock_send_report.call_count == 3
+
+    @patch('main.remember_user')
+    @patch('main.send_report_to_chat')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.is_admin')
+    @patch('main.user_states.get_state')
+    def test_report_command_non_admin(self, mock_get_state, mock_is_admin, mock_get_kb, mock_send_msg, mock_send_report, mock_remember_user):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        mock_is_admin.return_value = False
+        mock_get_kb.return_value = 'user_kb'
+        
+        main_loop_handler(123, 'отчет')
+        mock_send_msg.assert_called_once_with(123, 'У вас нет доступа к этой команде.', 'user_kb')
+
+    @patch('main.remember_user')
+    @patch('main.send_known_users_to_admin')
+    @patch('main.user_states.get_state')
+    def test_users_list_command_admin(self, mock_get_state, mock_send_users, mock_remember_user):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        main_loop_handler(710547454, 'список пользователей')
+        mock_send_users.assert_called_once_with(710547454)
+
+    @patch('main.is_admin')
+    @patch('main.send_msg')
+    @patch('main.get_main_keyboard_for_user')
+    @patch('main.user_states.get_state')
+    def test_users_list_command_non_admin(self, mock_get_state, mock_get_kb, mock_send_msg, mock_is_admin):
+        from main import main_loop_handler
+        mock_get_state.return_value = None
+        mock_is_admin.return_value = False
+        mock_get_kb.return_value = 'user_kb'
+        
+        main_loop_handler(123, 'список пользователей')
         mock_send_msg.assert_called_once_with(123, 'У вас нет доступа к этой команде.', 'user_kb')
 
     @patch('threading.Thread')
@@ -584,61 +1006,3 @@ class TestMainLoopCommands:
         main_loop_handler(123, 'что-то непонятное')
         mock_send_msg.assert_called_once_with(123, 'Неизвестная команда. Напишите \'Помощь\' или используйте кнопки.', 'main_kb')
 
-
-def main_loop_handler(user_id, msg):
-    from main import handle_application, handle_message
-    if user_states.get_state(user_id):
-        handle_application(user_id, msg)
-    else:
-        handle_message(user_id, msg)
-
-
-def handle_message(user_id, msg):
-    from main import (
-        send_msg, get_main_keyboard_for_user, is_admin, handle_application,
-        send_report_to_chat, send_email_report, get_admin_keyboard, threading
-    )
-    
-    if msg == "hi":
-        send_msg(user_id, "Привет! Я бот для работы с заявками. Выберите действие:", get_main_keyboard_for_user(user_id))
-    elif msg in ("заявка", "оставить заявку"):
-        handle_application(user_id, None)
-    elif msg in ("отчет", "заявки", "посмотреть заявки"):
-        if not is_admin(user_id):
-            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
-        else:
-            send_report_to_chat(user_id)
-    elif msg in ("почта", "отчет на почту", "отправь по почте заявки"):
-        if not is_admin(user_id):
-            send_msg(user_id, "У вас нет доступа к этой команде.", get_main_keyboard_for_user(user_id))
-        else:
-            threading.Thread(target=send_email_report, daemon=True).start()
-            send_msg(user_id, "Отчет отправляется на почту. Ожидайте.", get_admin_keyboard())
-    elif msg == "админ" or msg == "панель админа":
-        if not is_admin(user_id):
-            send_msg(user_id, "У вас нет доступа к админ-панели.", get_main_keyboard_for_user(user_id))
-        else:
-            send_msg(user_id, "Панель администратора:", get_admin_keyboard())
-    elif msg == "назад":
-        send_msg(user_id, "Главное меню:", get_main_keyboard_for_user(user_id))
-    elif msg == "помощь":
-        if is_admin(user_id):
-            help_text = (
-                "Доступные команды:\n\n"
-                "Оставить заявку - подать заявку\n"
-                "Посмотреть заявки - показать последние 10 заявок\n"
-                "Отчет на почту - отправить отчет на email\n"
-                "Помощь - это сообщение"
-            )
-        else:
-            help_text = (
-                "Доступные команды:\n\n"
-                "Оставить заявку - подать заявку\n"
-                "Помощь - это сообщение"
-            )
-        send_msg(user_id, help_text, get_main_keyboard_for_user(user_id))
-    else:
-        send_msg(user_id, "Неизвестная команда. Напишите 'Помощь' или используйте кнопки.", get_main_keyboard_for_user(user_id))
-
-
-user_states = None
