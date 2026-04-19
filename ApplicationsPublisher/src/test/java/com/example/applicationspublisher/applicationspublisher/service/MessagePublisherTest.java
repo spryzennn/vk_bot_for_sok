@@ -27,16 +27,13 @@ class MessagePublisherTest {
 
     @Test
     void publishApplication_shouldSendMessageToQueue() {
-        // Arrange
         ApplicationDto application = new ApplicationDto();
         application.setFullName("Test");
         application.setPhone("123");
         application.setOption("Option");
 
-        // Act
         messagePublisher.publishApplication(application);
 
-        // Assert
         verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.QUEUE_NAME), eq(application));
     }
 
@@ -48,10 +45,8 @@ class MessagePublisherTest {
         application.setPhone("123");
         application.setOption("Option");
 
-        // Simulate exception
         doThrow(new RuntimeException("RabbitMQ error")).when(rabbitTemplate).convertAndSend(anyString(), (Object) any());
 
-        // Act & Assert
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> messagePublisher.publishApplication(application));
         assertEquals("RabbitMQ error", thrown.getMessage());
     }

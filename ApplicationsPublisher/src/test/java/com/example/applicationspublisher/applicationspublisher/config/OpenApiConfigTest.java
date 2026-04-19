@@ -12,10 +12,8 @@ class OpenApiConfigTest {
 
     @Test
     void openAPI_shouldReturnOpenAPIObjectWithCorrectInfo() {
-        // Act
         OpenAPI api = config.openAPI();
 
-        // Assert
         assertNotNull(api);
         assertNotNull(api.getInfo());
         assertEquals("Applications Publisher API", api.getInfo().getTitle());

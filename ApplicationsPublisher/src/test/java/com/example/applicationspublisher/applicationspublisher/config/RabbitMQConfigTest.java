@@ -13,10 +13,8 @@ class RabbitMQConfigTest {
 
     @Test
     void applicationsQueue_shouldReturnQueueWithCorrectNameAndDurable() {
-        // Act
         Queue queue = config.applicationsQueue();
 
-        // Assert
         assertNotNull(queue);
         assertEquals("applicationsQueue", queue.getName());
         assertTrue(queue.isDurable());
@@ -24,10 +22,8 @@ class RabbitMQConfigTest {
 
     @Test
     void jsonMessageConverter_shouldReturnJacksonConverter() {
-        // Act
         MessageConverter converter = config.jsonMessageConverter();
 
-        // Assert
         assertNotNull(converter);
         assertTrue(converter instanceof Jackson2JsonMessageConverter);
     }

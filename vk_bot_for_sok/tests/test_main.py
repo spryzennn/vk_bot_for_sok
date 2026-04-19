@@ -139,9 +139,10 @@ class TestMainFunctions:
         mock_method.assert_called_once()
         call_args = mock_method.call_args
         assert call_args[0][0] == "messages.send"
-        assert call_args[1]['user_id'] == 123
-        assert call_args[1]['message'] == "Hello"
-        assert call_args[1]['random_id'] == 0
+        params = call_args[0][1]
+        assert params['user_id'] == 123
+        assert params['message'] == "Hello"
+        assert params['random_id'] == 0
 
     @patch('main.vk_session')
     def test_send_msg_with_keyboard(self, mock_vk_session):
@@ -150,7 +151,8 @@ class TestMainFunctions:
         mock_vk_session.method = mock_method
         send_msg(123, "Hello", '{"keyboard": "test"}')
         call_args = mock_method.call_args
-        assert call_args[1]['keyboard'] == '{"keyboard": "test"}'
+        params = call_args[0][1]
+        assert params['keyboard'] == '{"keyboard": "test"}'
 
     @patch('main.vk_session')
     @patch('main.logger')

@@ -12,7 +12,6 @@ class WebConfigTest {
 
     @Test
     void corsConfigurer_shouldConfigureCorsForApiPaths() {
-        // Arrange
         CorsRegistry registry = mock(CorsRegistry.class);
         CorsRegistration registration = mock(CorsRegistration.class);
         when(registry.addMapping("/api/**")).thenReturn(registration);
@@ -21,11 +20,9 @@ class WebConfigTest {
         when(registration.allowedHeaders("*")).thenReturn(registration);
         when(registration.allowCredentials(true)).thenReturn(registration);
 
-        // Act
         WebMvcConfigurer corsConfigurer = config.corsConfigurer();
         corsConfigurer.addCorsMappings(registry);
 
-        // Assert
         verify(registry).addMapping("/api/**");
         verify(registration).allowedOrigins("http://localhost:8000");
         verify(registration).allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS");

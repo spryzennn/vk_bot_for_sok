@@ -77,7 +77,7 @@ class TestSendMsg:
         rl = rl_setup['module']
         mock_method = rl.vk_session.method
         rl.send_msg(123, "Hello")
-        mock_method.assert_called_once_with("messages.send", user_id=123, message="Hello", random_id=0)
+        mock_method.assert_called_once_with("messages.send", {"user_id": 123, "message": "Hello", "random_id": 0})
 
     def test_send_msg_vk_api_error(self, rl_setup, caplog):
         rl = rl_setup['module']
@@ -97,8 +97,8 @@ class TestNotifyAdminsAboutApplication:
         rl.vk_session.method.assert_called()
         # Check that the message content is correct
         call_args = rl.vk_session.method.call_args
-        assert call_args[0] == ("messages.send",)
-        sent = call_args[1]
+        assert call_args[0][0] == "messages.send"
+        sent = call_args[0][1]
         assert sent["user_id"] == 123456  # admin_id from env (int from string)
         assert "Новая заявка!" in sent["message"]
         assert "John" in sent["message"]
