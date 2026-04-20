@@ -1,4 +1,3 @@
-/* Reset & Base */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap');
 
 * {
@@ -16,19 +15,16 @@ body {
   line-height: 1.6;
 }
 
-/* Smooth Scroll */
 html {
   scroll-behavior: smooth;
 }
 
-/* Container */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
-/* Header */
 .header {
   position: fixed;
   top: 0;
@@ -89,12 +85,10 @@ html {
   color: #333;
 }
 
-/* Sections */
 .section {
   padding: 80px 0;
 }
 
-/* Hero */
 .hero {
   margin-top: 100px;
   padding: 100px 20px;
@@ -120,7 +114,6 @@ html {
   line-height: 1.5;
 }
 
-/* About */
 .about {
   background: white;
 }
@@ -169,7 +162,6 @@ html {
   line-height: 1.6;
 }
 
-/* Directions */
 .directions {
   background: #f8f9fa;
 }
@@ -237,7 +229,6 @@ html {
   background: #4fa8c5;
 }
 
-/* Schedule */
 .schedule {
   background: white;
 }
@@ -285,7 +276,6 @@ html {
   font-size: 14px;
 }
 
-/* Stages */
 .stages {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -333,7 +323,6 @@ html {
   opacity: 0.9;
 }
 
-/* Apply Form */
 .apply {
   background: #f8f9fa;
 }
@@ -539,7 +528,6 @@ html {
   font-size: 14px;
 }
 
-/* Success Message */
 .success-message {
   text-align: center;
   padding: 60px 40px;
@@ -562,7 +550,6 @@ html {
   color: #666;
 }
 
-/* Questions */
 .questions {
   background: white;
 }
@@ -599,7 +586,6 @@ html {
   line-height: 1.6;
 }
 
-/* Footer */
 .footer {
   background: #333;
   color: white;
@@ -711,7 +697,6 @@ html {
   height: 14px;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .mobile-menu-btn {
     display: block;

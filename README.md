@@ -153,12 +153,15 @@ python src/rabbitmq_listener.py
 
 ### 4. Запуск сайта
 ```bash
-cd site
+cd client
 ```
 
 ```bash
-# Запуск на порту 8000
-python -m http.server 8000  
+# Запуск скачивание всех модулей
+npm i  
+
+# Запуск приложения на порту 3000
+npm start
 ```
 ## Тестирование
 

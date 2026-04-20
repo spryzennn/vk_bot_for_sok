@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
 
-// Header Component
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -40,7 +39,6 @@ function Header() {
   );
 }
 
-// Hero Section
 function Hero() {
   return (
     <section className="hero">
@@ -55,7 +53,6 @@ function Hero() {
   );
 }
 
-// About Section
 function About() {
   return (
     <section id="about" className="section about">
@@ -104,7 +101,6 @@ function About() {
   );
 }
 
-// Directions Section
 function Directions() {
   const directions = [
     {
@@ -154,7 +150,6 @@ function Directions() {
   );
 }
 
-// Schedule Section
 function Schedule() {
   return (
     <section id="schedule" className="section schedule">
@@ -185,7 +180,6 @@ function Schedule() {
   );
 }
 
-// Stages Section
 function Stages() {
   const stages = [
     {
@@ -228,7 +222,6 @@ function Stages() {
   );
 }
 
-// Apply Form Section
 function ApplyForm() {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -416,7 +409,6 @@ function ApplyForm() {
   );
 }
 
-// Questions Section
 function Questions() {
   const questions = [
     {
@@ -462,7 +454,6 @@ function Questions() {
   );
 }
 
-// Contacts/Footer Section
 function Footer() {
   return (
     <footer id="contacts" className="footer">
@@ -505,7 +496,6 @@ function Footer() {
   );
 }
 
-// Main App Component
 function App() {
   return (
     <div className="App">
