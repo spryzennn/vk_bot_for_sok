@@ -151,18 +151,6 @@ cd vk_bot_for_sok
 python src/rabbitmq_listener.py
 ```     
 
-### 4. Запуск сайта
-```bash
-cd client
-```
-
-```bash
-# Запуск скачивание всех модулей
-npm i  
-
-# Запуск приложения на порту 3000
-npm start
-```
 ## Тестирование
 
 ### Python VK бот
