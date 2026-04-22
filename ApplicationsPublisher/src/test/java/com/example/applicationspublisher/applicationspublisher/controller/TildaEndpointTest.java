@@ -11,22 +11,17 @@ import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
-class ApplicationControllerTest {
+class TildaEndpointTest {
 
     @Mock
     private MessagePublisher messagePublisher;
 
     @Test
-    void testSubmitApplication_Success() {
+    void testReceiveFromTilda_Success() {
         ApplicationController controller = new ApplicationController(messagePublisher);
-        ApplicationDto dto = new ApplicationDto();
-        dto.setFullName("Арсений");
-        dto.setPhone("+79991234567");
-        dto.setOption("test");
+        var response = controller.receiveFromTilda("Арсений", "+79991234567", "test");
 
-        var response = controller.submitApplication(dto);
-
-        assertEquals("Application submitted successfully", response.getBody());
+        assertEquals("Application submitted from Tilda", response.getBody());
         verify(messagePublisher).publishApplication(argThat(arg ->
             "Арсений".equals(arg.getFullName()) &&
             "+79991234567".equals(arg.getPhone()) &&
@@ -35,56 +30,37 @@ class ApplicationControllerTest {
     }
 
     @Test
-    void testSubmitApplication_EmptyFullName() {
+    void testReceiveFromTilda_EmptyFullName() {
         ApplicationController controller = new ApplicationController(messagePublisher);
-        ApplicationDto dto = new ApplicationDto();
-        dto.setFullName("");
-        dto.setPhone("+79991234567");
-        dto.setOption("test");
-
-        var response = controller.submitApplication(dto);
+        var response = controller.receiveFromTilda("", "+79991234567", "test");
 
         assertEquals("fullName is required", response.getBody());
         verify(messagePublisher, never()).publishApplication(any());
     }
 
     @Test
-    void testSubmitApplication_EmptyPhone() {
+    void testReceiveFromTilda_EmptyPhone() {
         ApplicationController controller = new ApplicationController(messagePublisher);
-        ApplicationDto dto = new ApplicationDto();
-        dto.setFullName("Арсений");
-        dto.setPhone("");
-        dto.setOption("test");
-
-        var response = controller.submitApplication(dto);
+        var response = controller.receiveFromTilda("Арсений", "", "test");
 
         assertEquals("phone is required", response.getBody());
         verify(messagePublisher, never()).publishApplication(any());
     }
 
     @Test
-    void testSubmitApplication_EmptyOption() {
+    void testReceiveFromTilda_EmptyOption() {
         ApplicationController controller = new ApplicationController(messagePublisher);
-        ApplicationDto dto = new ApplicationDto();
-        dto.setFullName("Арсений");
-        dto.setPhone("+79991234567");
-        dto.setOption("");
-
-        var response = controller.submitApplication(dto);
+        var response = controller.receiveFromTilda("Арсений", "+79991234567", "");
 
         assertEquals("option is required", response.getBody());
         verify(messagePublisher, never()).publishApplication(any());
     }
 
     @Test
-    void testSubmitApplication_OptionTooLong() {
+    void testReceiveFromTilda_OptionTooLong() {
         ApplicationController controller = new ApplicationController(messagePublisher);
-        ApplicationDto dto = new ApplicationDto();
-        dto.setFullName("Арсений");
-        dto.setPhone("+79991234567");
-        dto.setOption("a".repeat(51));
-
-        var response = controller.submitApplication(dto);
+        String longOption = "a".repeat(51);
+        var response = controller.receiveFromTilda("Арсений", "+79991234567", longOption);
 
         assertEquals("option must be max 50 characters", response.getBody());
         verify(messagePublisher, never()).publishApplication(any());
