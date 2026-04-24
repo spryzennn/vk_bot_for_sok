@@ -4,17 +4,15 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
 class OpenApiConfigTest {
+
+    private final OpenApiConfig config = new OpenApiConfig();
 
     @Test
     void openAPI_shouldReturnOpenAPIObjectWithCorrectInfo() {
-        OpenApiConfig config = new OpenApiConfig();
-
         OpenAPI api = config.customOpenAPI();
 
         assertNotNull(api);
@@ -26,17 +24,6 @@ class OpenApiConfigTest {
         assertEquals("Support", api.getInfo().getContact().getName());
 
         // Проверяем серверы
-        assertFalse(api.getServers().isEmpty());
-        assertEquals("https://quattuordevs.ru", api.getServers().get(0).getUrl());
-        assertEquals("Production server (HTTPS)", api.getServers().get(0).getDescription());
-    }
-
-    @Test
-    void openAPI_shouldUseHttpsByDefault() {
-        OpenApiConfig config = new OpenApiConfig();
-
-        OpenAPI api = config.customOpenAPI();
-
         assertFalse(api.getServers().isEmpty());
         assertEquals("https://quattuordevs.ru", api.getServers().get(0).getUrl());
         assertEquals("Production server (HTTPS)", api.getServers().get(0).getDescription());
