@@ -18,8 +18,7 @@ public class OpenApiConfig {
                         .version("1.0.0")
                         .description("API для приёма заявок и отправки в RabbitMQ")
                         .contact(new Contact()
-                                .name("Support")
-                                .email("lapinka.maksimka@gmail.com")));
+                                .name("Support")));
 
         openAPI.addServersItem(new Server()
                 .url("https://quattuordevs.ru")
