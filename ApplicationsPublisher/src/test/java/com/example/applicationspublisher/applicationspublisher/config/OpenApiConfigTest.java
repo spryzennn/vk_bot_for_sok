@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class OpenApiConfigTest {
@@ -12,7 +13,7 @@ class OpenApiConfigTest {
 
     @Test
     void openAPI_shouldReturnOpenAPIObjectWithCorrectInfo() {
-        OpenAPI api = config.openAPI();
+        OpenAPI api = config.customOpenAPI();
 
         assertNotNull(api);
         assertNotNull(api.getInfo());
@@ -21,6 +22,10 @@ class OpenApiConfigTest {
         assertEquals("1.0.0", api.getInfo().getVersion());
         assertNotNull(api.getInfo().getContact());
         assertEquals("Support", api.getInfo().getContact().getName());
-        assertEquals("lapinka.maksimka@gmail.com", api.getInfo().getContact().getEmail());
+
+        // Проверяем серверы
+        assertFalse(api.getServers().isEmpty());
+        assertEquals("https://quattuordevs.ru", api.getServers().get(0).getUrl());
+        assertEquals("Production server (HTTPS)", api.getServers().get(0).getDescription());
     }
 }

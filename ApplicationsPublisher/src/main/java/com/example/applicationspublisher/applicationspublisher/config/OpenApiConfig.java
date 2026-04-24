@@ -3,6 +3,7 @@ package com.example.applicationspublisher.applicationspublisher.config;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -10,14 +11,19 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI openAPI() {
-        return new OpenAPI()
+    public OpenAPI customOpenAPI() {
+        OpenAPI openAPI = new OpenAPI()
                 .info(new Info()
                         .title("Applications Publisher API")
-                        .description("API для приёма заявок и отправки в RabbitMQ")
                         .version("1.0.0")
+                        .description("API для приёма заявок и отправки в RabbitMQ")
                         .contact(new Contact()
-                                .name("Support")
-                                .email("lapinka.maksimka@gmail.com")));
+                                .name("Support")));
+
+        openAPI.addServersItem(new Server()
+                .url("https://quattuordevs.ru")
+                .description("Production server (HTTPS)"));
+
+        return openAPI;
     }
 }
