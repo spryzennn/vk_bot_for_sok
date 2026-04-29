@@ -45,22 +45,24 @@ public class ApplicationController {
 
     @PostMapping(value = "/tilda", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<String> receiveFromTilda(
-            @RequestParam("Name") String name,
-            @RequestParam("Phone") String phone,
-            @RequestParam("Option") String option) {
+            @RequestParam("name") String name,
+            @RequestParam("phone") String phone,
+            @RequestParam("option") String option) {
+
+        System.out.println("[Tilda] Received: name=" + name + ", phone=" + phone + ", option=" + option);
 
         ApplicationDto dto = new ApplicationDto();
         dto.setFullName(name);
         dto.setPhone(phone);
         dto.setOption(option);
 
-        if (dto.getFullName() == null || dto.getFullName().isEmpty()) {
+        if (dto.getFullName() == null || dto.getFullName().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("fullName is required");
         }
-        if (dto.getPhone() == null || dto.getPhone().isEmpty()) {
+        if (dto.getPhone() == null || dto.getPhone().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("phone is required");
         }
-        if (dto.getOption() == null || dto.getOption().isEmpty()) {
+        if (dto.getOption() == null || dto.getOption().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("option is required");
         }
         if (dto.getOption().length() > 50) {
